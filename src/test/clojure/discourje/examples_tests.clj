@@ -85,7 +85,12 @@
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.tic-tac-toe]
-                       {}))
+                       {:buffered [true]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.tic-tac-toe]
+                       {:buffered [false]}))
   (is true)
 
   ;; Chess

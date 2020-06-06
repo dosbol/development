@@ -229,7 +229,7 @@
     :sync #{(:sender ast) (:receiver ast)}
     :send #{(:sender ast)}
     :receive #{(:receiver ast)}
-    :close #{(:sender ast) (:receiver ast)}
+    :close #{(:sender ast)}
 
     ;; Unary operators
     (= (:type ast) :end)
@@ -346,7 +346,9 @@
                   (if (= i (count branches'))
                     m
                     (recur (inc i)
-                           (union roles (subjects (nth branches' i)))
+                           (union roles (if (< i (dec (count branches')))
+                                          (subjects (nth branches' i))
+                                          #{}))
                            (merge-with into m (filter (fn [[ast-action _]] (empty? (intersection roles (subjects ast-action))))
                                                       (successors ast' i unfolded))))))))
      :every (successors (eval-ast ast) unfolded)
