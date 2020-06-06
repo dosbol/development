@@ -335,7 +335,12 @@
                   m
                   (recur (inc i) (merge-with into m (successors ast' i unfolded)))))))
      :async (let [branches (:branches ast)
-                  branches' (filterv #(not (empty? (successors % unfolded))) branches)
+                  branches' (loop [branches branches]
+                              (if (empty? branches)
+                                [(ast/end)]
+                                (if (empty? (successors (first branches) unfolded))
+                                  (recur (rest branches))
+                                  (vec branches))))
                   ast' (ast/async branches')]
               (case (count branches')
                 0 {}

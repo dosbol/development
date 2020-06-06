@@ -94,10 +94,10 @@
   (action :send predicate sender receiver))
 
 (defn receive [sender receiver]
-  (action :receive (predicate '(fn [_] true)) sender receiver))
+  (action :receive (predicate '(fn [__] true)) sender receiver))
 
 (defn close [sender receiver]
-  (action :close (predicate '(fn [_] true)) sender receiver))
+  (action :close (predicate '(fn [__] true)) sender receiver))
 
 ;;;;
 ;;;; Nullary operators
