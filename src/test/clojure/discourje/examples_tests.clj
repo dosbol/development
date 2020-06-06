@@ -97,7 +97,12 @@
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.chess]
-                       {:stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+                       {:buffered [true] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.chess]
+                       {:buffered [false] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
   (is true)
 
   ;; Rock-Paper-Scissors

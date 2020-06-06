@@ -14,14 +14,23 @@
 (s/defrole ::white)
 (s/defrole ::black)
 
-(s/defsession ::chess []
-  (::chess-turn ::white ::black))
+(s/defsession ::chess-unbuffered []
+  (::chess-turn-unbuffered ::white ::black))
 
-(s/defsession ::chess-turn [r1 r2]
-  (s/--> String r1 r2)
-  (s/alt (::chess-turn r2 r1)
-         (s/par (s/close r1 r2)
-                (s/close r2 r1))))
+(s/defsession ::chess-turn-unbuffered [r1 r2]
+  (s/cat (s/--> String r1 r2)
+         (s/alt (::chess-turn-unbuffered r2 r1)
+                (s/par (s/close r1 r2)
+                       (s/close r2 r1)))))
+
+(s/defsession ::chess-buffered []
+  (::chess-turn-buffered ::white ::black))
+
+(s/defsession ::chess-turn-buffered [r1 r2]
+  (s/async (s/-->> String r1 r2)
+           (s/alt (::chess-turn-buffered r2 r1)
+                  (s/par (s/close r1 r2)
+                         (s/close r2 r1)))))
 
 ;;;;
 ;;;; Implementation
@@ -29,6 +38,7 @@
 
 (let [input config/*input*
       _ (:resolution input)
+      buffered (:buffered input)
       stockfish (:stockfish input)
       turns-per-player (:turns-per-player input)
       time-per-player (:time-per-player input)]
@@ -42,13 +52,13 @@
         begin (System/nanoTime)
 
         ;; Create channels
-        w->b (a/chan)
-        b->w (a/chan)
+        w->b (if buffered (a/chan 1) (a/chan))
+        b->w (if buffered (a/chan 1) (a/chan))
 
         ;; Link monitor [optional]
         _
         (if (= config/*lib* :dcj)
-          (let [s (chess)
+          (let [s (if buffered (chess-buffered) (chess-unbuffered))
                 m (a/monitor s)]
             (a/link w->b white black m)
             (a/link b->w black white m)))
