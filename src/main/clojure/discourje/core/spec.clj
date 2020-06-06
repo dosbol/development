@@ -174,7 +174,6 @@
 ;;;;
 
 ;; TODO: Merge/shuffle on trajectories
-;; TODO: Prefixing (. x y z)
 
 (defn- multiary [f branches]
   (clojure.core/let [branches (mapv (comp macroexpand desugared-spec) branches)]
@@ -195,6 +194,10 @@
   [& branches]
   (multiary `ast/par branches))
 
+(defmacro async
+  [& branches]
+  (multiary `ast/async branches))
+
 (defn- every [f bindings branch]
   (clojure.core/let [branch (macroexpand (desugared-spec branch))]
     `(ast/every ~f ~bindings ~branch)))
@@ -210,6 +213,10 @@
 (defmacro par-every
   [bindings branch]
   (every `ast/par `(w/postwalk-replace ~(smap &env) '~bindings) branch))
+
+(defmacro async-every
+  [bindings branch]
+  (every `ast/async `(w/postwalk-replace ~(smap &env) '~bindings) branch))
 
 ;;;;
 ;;;; "Special forms" operators

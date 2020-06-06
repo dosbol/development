@@ -120,6 +120,8 @@
   (->Multiary :alt branches))
 (defn par [branches]
   (->Multiary :par branches))
+(defn async [branches]
+  (->Multiary :async branches))
 
 (defrecord Every [type ast-f vars exprs branch])
 
