@@ -639,7 +639,7 @@
   (let [lts1 (lts/lts (s/async (s/alt (s/-->> ::alice ::bob)
                                       (s/end))
                                (s/-->> ::alice ::carol)))
-        lts2 (lts/lts (s/graph des (0, 12, 9)
+        lts2 (lts/lts (s/graph des (0, 9, 7)
                                (0, "!(Object,alice,bob)", 1)
                                (0, "!(Object,alice,carol)", 2)
                                (1, "?(alice,bob)", 3)
@@ -690,7 +690,7 @@
 
   (let [lts1 (lts/lts (s/cat-every [i (range 2)
                                     j (range 2)]
-                                   (s/-->> (::alice i) (::bob j))))
+                        (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/cat (s/-->> (::alice 0) (::bob 0))
                              (s/-->> (::alice 0) (::bob 1))
                              (s/-->> (::alice 1) (::bob 0))
@@ -699,7 +699,7 @@
 
   (let [lts1 (lts/lts (s/cat-every [i (range 3)
                                     j (range i)]
-                                   (s/-->> (::alice i) (::bob j))))
+                        (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/cat (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]
@@ -726,7 +726,7 @@
 
   (let [lts1 (lts/lts (s/alt-every [i (range 2)
                                     j (range 2)]
-                                   (s/-->> (::alice i) (::bob j))))
+                        (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/alt (s/-->> (::alice 0) (::bob 0))
                              (s/-->> (::alice 0) (::bob 1))
                              (s/-->> (::alice 1) (::bob 0))
@@ -735,7 +735,7 @@
 
   (let [lts1 (lts/lts (s/alt-every [i (range 3)
                                     j (range i)]
-                                   (s/-->> (::alice i) (::bob j))))
+                        (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/alt (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]
@@ -770,7 +770,7 @@
 
   (let [lts1 (lts/lts (s/par-every [i (range 3)
                                     j (range i)]
-                                   (s/-->> (::alice i) (::bob j))))
+                        (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/par (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]
