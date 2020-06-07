@@ -2,6 +2,7 @@
   (:require [clojure.string :refer [join]]
             [clojure.java.shell :refer [sh]]
             [clojure.pprint :refer [pprint]]
+            [discourje.core.spec :as s]
             [discourje.core.spec.lts :as lts])
   (:import (java.io File)))
 
@@ -55,6 +56,34 @@
       (clojure.java.io/delete-file mcf-file)
       (clojure.java.io/delete-file mcrl2-file)
       (clojure.java.io/delete-file pbes-file))))
+
+(let [lts (lts/lts (s/graph des (0,24,16)
+                            (0,"!(Object,alice,bob)",1)
+                            (0,"!(Object,alice,carol)",2)
+                            (1,"?(alice,bob)",3)
+                            (1,"!(Object,carol,dave)",4)
+                            (2,"?(alice,carol)",3)
+                            (2,"!(Object,bob,dave)",18)
+                            (3,"!(Object,bob,dave)",5)
+                            (3,"!(Object,carol,dave)",6)
+                            (4,"?(alice,bob)",6)
+                            (4,"?(carol,dave)",16)
+                            (5,"?(bob,dave)",7)
+                            (5,"!(Object,carol,dave)",8)
+                            (6,"!(Object,bob,dave)",8)
+                            (6,"?(carol,dave)",13)
+                            (7,"!(Object,carol,dave)",9)
+                            (8,"?(bob,dave)",9)
+                            (8,"?(carol,dave)",12)
+                            (9,"?(carol,dave)",10)
+                            (12,"?(bob,dave)",10)
+                            (13,"!(Object,bob,dave)",12)
+                            (16,"?(alice,bob)",13)
+                            (18,"?(alice,carol)",5)
+                            (18,"?(bob,dave)",20)
+                            (20,"?(alice,carol)",7)))]
+  (binding [*mcrl2-bin* "/Applications/mCRL2.app/Contents/bin"]
+    (ltsgraph lts "/Users/sungshik/Desktop/temp")))
 
 ;;;;;
 ;;;;; Example

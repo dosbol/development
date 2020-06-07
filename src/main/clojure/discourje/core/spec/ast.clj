@@ -94,10 +94,10 @@
   (action :send predicate sender receiver))
 
 (defn receive [sender receiver]
-  (action :receive (predicate '(fn [_] true)) sender receiver))
+  (action :receive (predicate '(fn [__] true)) sender receiver))
 
 (defn close [sender receiver]
-  (action :close (predicate '(fn [_] true)) sender receiver))
+  (action :close (predicate '(fn [__] true)) sender receiver))
 
 ;;;;
 ;;;; Nullary operators
@@ -105,8 +105,8 @@
 
 (defrecord Nullary [type])
 
-(defn end []
-  (->Nullary :end))
+(defn skip []
+  (->Nullary :skip))
 
 ;;;;
 ;;;; Multiary operators
@@ -120,6 +120,8 @@
   (->Multiary :alt branches))
 (defn par [branches]
   (->Multiary :par branches))
+(defn async [branches]
+  (->Multiary :async branches))
 
 (defrecord Every [type ast-f vars exprs branch])
 

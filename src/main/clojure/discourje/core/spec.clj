@@ -1,6 +1,6 @@
 (ns discourje.core.spec
   (:gen-class)
-  (:refer-clojure :exclude [if do let loop cat * + apply count empty? disj])
+  (:refer-clojure :exclude [if do let loop cat * + count empty? disj])
   (:require [clojure.walk :as w]
             [discourje.core.spec.ast :as ast]))
 
@@ -124,9 +124,9 @@
 ;;;; Nullary operators
 ;;;;
 
-(defmacro end
+(defmacro skip
   []
-  `(ast/end))
+  `(ast/skip))
 
 (defmacro any
   [roles]
@@ -147,39 +147,55 @@
 ;;;; Unary operators
 ;;;;
 
-(defmacro ω
-  [& body]
-  (clojure.core/let [name `ω#]
-    `(loop ~name [] ~@body (s/recur ~name))))
-
-(defmacro omega
-  [& body]
-  `(ω ~@body))
-
 (defmacro *
-  [& body]
-  (clojure.core/let [name `*#]
-    `(loop ~name [] (alt (cat ~@body (s/recur ~name)) (end)))))
+  ([body]
+   `(* ~body (skip)))
+  ([body continuation]
+   (clojure.core/let [name `*#]
+     `(loop ~name [] (alt (cat ~body (s/recur ~name)) ~continuation)))))
 
 (defmacro +
-  [& body]
-  `(cat ~@body (* ~@body)))
+  ([body]
+   `(+ ~body (skip)))
+  ([body continuation]
+   `(cat ~body (* ~body ~continuation))))
 
 (defmacro ?
-  [& body]
-  `(alt (cat ~@body) (end)))
+  [body]
+  `(alt ~body (skip)))
+
+(defmacro async*
+  ([body]
+   `(async* ~body (skip)))
+  ([body continuation]
+   (clojure.core/let [name `*#]
+     `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation)))))
+
+(defmacro async+
+  ([body]
+   `(async+ ~body (skip)))
+  ([body continuation]
+   `(async ~body (async* ~body ~continuation))))
+
+(defmacro ω
+  [body]
+  (clojure.core/let [name `ω#]
+    `(loop ~name [] ~body (s/recur ~name))))
+
+(defmacro omega
+  [body]
+  `(ω ~body))
 
 ;;;;
 ;;;; Multiary operators
 ;;;;
 
 ;; TODO: Merge/shuffle on trajectories
-;; TODO: Prefixing (. x y z)
 
 (defn- multiary [f branches]
   (clojure.core/let [branches (mapv (comp macroexpand desugared-spec) branches)]
     (case (clojure.core/count branches)
-      0 `(end)
+      0 `(skip)
       1 (first branches)
       `(~f ~branches))))
 
@@ -194,6 +210,10 @@
 (defmacro par
   [& branches]
   (multiary `ast/par branches))
+
+(defmacro async
+  [& branches]
+  (multiary `ast/async branches))
 
 (defn- every [f bindings branch]
   (clojure.core/let [branch (macroexpand (desugared-spec branch))]
@@ -211,13 +231,17 @@
   [bindings branch]
   (every `ast/par `(w/postwalk-replace ~(smap &env) '~bindings) branch))
 
+(defmacro async-every
+  [bindings branch]
+  (every `ast/async `(w/postwalk-replace ~(smap &env) '~bindings) branch))
+
 ;;;;
 ;;;; "Special forms" operators
 ;;;;
 
 (defmacro if
   ([test-expr then]
-   `(s/if ~test-expr ~then (end)))
+   `(s/if ~test-expr ~then (skip)))
   ([test-expr then else]
    (clojure.core/let [then (macroexpand (desugared-spec then))
                       else (macroexpand (desugared-spec else))]
@@ -274,16 +298,16 @@
     `(ast/put-ast! ~k (w/postwalk-replace ~(smap &env) '~vars) ~body)))
 
 (s/defsession ::-->>not [t r1 r2]
-              (s/-->> (fn [x] (not= (type x) t)) r1 r2))
+  (s/-->> (fn [x] (not= (type x) t)) r1 r2))
 
 (s/defsession ::pipe [t r-name min max]
-              (s/loop pipe [i min]
-                      (s/if (< i (dec max))
-                        (s/cat (s/-->> t (r-name i) (r-name (inc i)))
-                               (s/recur pipe (inc i))))))
+  (s/loop pipe [i min]
+          (s/if (< i (dec max))
+            (s/cat (s/-->> t (r-name i) (r-name (inc i)))
+                   (s/recur pipe (inc i))))))
 
 (s/defsession ::pipe [t r-name n]
-              (s/session ::pipe ['t r-name 0 n]))
+  (s/session ::pipe ['t r-name 0 n]))
 
 ;;;;
 ;;;; Set operations (convenience)

@@ -85,28 +85,48 @@
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.tic-tac-toe]
-                       {}))
+                       {:buffered [true]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.tic-tac-toe]
+                       {:buffered [false]}))
   (is true)
 
   ;; Chess
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.chess]
-                       {:stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+                       {:buffered [true] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.chess]
+                       {:buffered [false] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
   (is true)
 
   ;; Rock-Paper-Scissors
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.rock-paper-scissors]
-                       {:k [3]}))
+                       {:buffered [true] :k [3]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.rock-paper-scissors]
+                       {:buffered [false] :k [3]}))
   (is true)
 
   ;; Go Fish
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.go-fish]
-                       {:k [3]}))
+                       {:buffered [true] :k [3]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.go-fish]
+                       {:buffered [false] :k [3]}))
   (is true))
 
 (deftest npb3-tests

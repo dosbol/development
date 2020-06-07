@@ -1,6 +1,7 @@
 (ns discourje.core.spec.interp
   (:refer-clojure :exclude [eval])
-  (:require [clojure.walk :as w]
+  (:require [clojure.set :refer :all]
+            [clojure.walk :as w]
             [discourje.core.spec.ast :as ast]))
 
 (def ^:dynamic *hist* nil)
@@ -83,13 +84,14 @@
     :receive (w/postwalk-replace smap ast)
     :close (w/postwalk-replace smap ast)
 
-    ;; Unary operators
-    :end ast
+    ;; Nullary operators
+    :skip ast
 
     ;; Multiary operators
     :cat (ast/cat (mapv #(substitute % smap) (:branches ast)))
     :alt (ast/alt (mapv #(substitute % smap) (:branches ast)))
     :par (ast/par (mapv #(substitute % smap) (:branches ast)))
+    :async (ast/async (mapv #(substitute % smap) (:branches ast)))
     :every (ast/every (:ast-f ast)
                       (:vars ast)
                       (w/postwalk-replace smap (:exprs ast))
@@ -125,12 +127,13 @@
     :close ast
 
     ;; Nullary operators
-    :end ast
+    :skip ast
 
     ;; Multiary operators
     :cat (ast/cat (mapv #(unfold % ast-loop) (:branches ast)))
     :alt (ast/alt (mapv #(unfold % ast-loop) (:branches ast)))
     :par (ast/par (mapv #(unfold % ast-loop) (:branches ast)))
+    :async (ast/async (mapv #(unfold % ast-loop) (:branches ast)))
     :every (ast/every (:ast-f ast)
                       (:vars ast)
                       (:exprs ast)
@@ -168,12 +171,13 @@
     :close (throw (Exception.))
 
     ;; Nullary operators
-    :end (throw (Exception.))
+    :skip (throw (Exception.))
 
     ;; Concatenation
     :cat (throw (Exception.))
     :alt (throw (Exception.))
     :par (throw (Exception.))
+    :async (throw (Exception.))
     :every (let [smaps (loop [vars (:vars ast)
                               exprs (:exprs ast)
                               smaps [{}]]
@@ -218,36 +222,38 @@
 
     (throw (Exception.))))
 
-;(defn subjects [ast]
-;  (case (:type ast)
-;
-;    ;; Actions
-;    :sync #{(:sender ast) (:receiver ast)}
-;    :send #{(:sender ast)}
-;    :receive #{(:receiver ast)}
-;    :close #{(:sender ast) (:receiver ast)}
-;
-;    ;; Unary operators
-;    (= (:type ast) :end)
-;    #{}
-;
-;    ;; Multiary operators
-;    :cat (reduce into (map #(subjects %) (:branches ast)))
-;    :alt (reduce into (map #(subjects %) (:branches ast)))
-;    :par (reduce into (map #(subjects %) (:branches ast)))
-;    :every (subjects (eval-ast ast))
-;
-;    ;; "Special forms" operators
-;    :if (subjects (eval-ast ast))
-;    :loop (subjects (eval-ast ast))
-;    :recur (throw (Exception.))
-;
-;    ;; Misc operators
-;    :graph (throw (Exception.))
-;
-;    ;; Sessions
-;    :session (throw (Exception.))
-;    (throw (Exception.))))
+(defn subjects [ast]
+  (case (:type ast)
+
+    ;; Actions
+    :sync #{(:sender ast) (:receiver ast)}
+    :send #{(:sender ast)}
+    :receive #{(:receiver ast)}
+    :close #{(:sender ast)}
+
+    ;; Nullary operators
+    :skip #{}
+
+    ;; Multiary operators
+    :cat (reduce into (map #(subjects %) (:branches ast)))
+    :alt (reduce into (map #(subjects %) (:branches ast)))
+    :par (reduce into (map #(subjects %) (:branches ast)))
+    :async (reduce into (map #(subjects %) (:branches ast)))
+    :every (subjects (eval-ast ast))
+
+    ;; "Special forms" operators
+    :if (subjects (eval-ast ast))
+    :loop (if (empty? (:vars ast))
+            (subjects (:body ast))
+            (throw (Exception.)))
+    :recur #{}
+
+    ;; Misc operators
+    :graph (throw (Exception.))
+
+    ;; Sessions
+    :session (throw (Exception.))
+    (throw (Exception.))))
 
 (defn terminated? [ast unfolded]
   (case (:type ast)
@@ -259,12 +265,13 @@
     :close false
 
     ;; Nullary operators
-    :end true
+    :skip true
 
     ;; Multiary operators
     :cat (every? #(terminated? % unfolded) (:branches ast))
     :alt (not (not-any? #(terminated? % unfolded) (:branches ast)))
     :par (every? #(terminated? % unfolded) (:branches ast))
+    :async (every? #(terminated? % unfolded) (:branches ast))
     :every (terminated? (eval-ast ast) unfolded)
 
     ;; "Special forms" operators
@@ -291,13 +298,13 @@
    (case (:type ast)
 
      ;; Actions
-     :sync {ast [(ast/end)]}
-     :send {ast [(ast/end)]}
-     :receive {ast [(ast/end)]}
-     :close {ast [(ast/end)]}
+     :sync {ast [(ast/skip)]}
+     :send {ast [(ast/skip)]}
+     :receive {ast [(ast/skip)]}
+     :close {ast [(ast/skip)]}
 
      ;; Nullary operators
-     :end {}
+     :skip {}
 
      ;; Multiary operators
      :cat (let [branches (:branches ast)]
@@ -318,7 +325,8 @@
      :alt (let [branches (:branches ast)]
             (reduce (partial merge-with into) (map #(successors % unfolded) branches)))
      :par (let [branches (:branches ast)
-                branches' (filterv #(not (empty? (successors % unfolded))) branches)]
+                branches' (filterv #(not (empty? (successors % unfolded))) branches)
+                ast' (ast/par branches')]
             (case (count branches')
               0 {}
               1 (successors (first branches') unfolded)
@@ -326,22 +334,35 @@
                      m {}]
                 (if (= i (count branches'))
                   m
-                  (recur (inc i) (merge-with into m (successors (ast/par branches') i unfolded)))))))
-     ;:dot (let [branches ast]
-     ;       (if (empty? branches)
-     ;         {}
-     ;         (merge-with into
-     ;                     ;; Rule 1
-     ;                     (successors ast 0 unfolded)
-     ;                     ;; Rule 2
-     ;                     (let [branch (first branches)
-     ;                           branches-after (rest branches)
-     ;                           roles (subjects branch)]
-     ;                       (filter (fn [[ast-action _]] (empty? (clojure.set/intersection roles (subjects ast-action))))
-     ;                               (case (count branches-after)
-     ;                                 0 {}
-     ;                                 1 (successors (first branches-after) unfolded)
-     ;                                 (successors (ast/cat (vec branches-after)) unfolded)))))))
+                  (recur (inc i) (merge-with into m (successors ast' i unfolded)))))))
+
+     :async (let [branches (:branches ast)]
+              (if (empty? branches)
+                {}
+                (reduce (partial merge-with into)
+                        [;; Rule 1
+                         (successors ast 0 unfolded)
+                         ;; Rule 2
+                         (let [branch (first branches)
+                               branches-after (rest branches)]
+                           (if (terminated? branch #{})
+                             (case (count branches-after)
+                               0 {}
+                               1 (successors (first branches-after) unfolded)
+                               (successors (ast/async (vec branches-after)) unfolded))
+                             {}))
+                         ; Rule 3
+                         (let [branch (first branches)
+                               branches-after (rest branches)
+                               roles (subjects branch)]
+                           (if (not (empty? (successors branch unfolded)))
+                             (filter (fn [[ast-action _]] (empty? (intersection roles (subjects ast-action))))
+                                     (case (count branches-after)
+                                       0 {}
+                                       1 (successors ast 1 unfolded)
+                                       (successors (ast/async [branch (ast/async (vec branches-after))]) 1 unfolded)))
+                             {}))
+                         ])))
      :every (successors (eval-ast ast) unfolded)
 
      ;; "Special forms" operators
@@ -357,7 +378,7 @@
                   vals (map (fn [k]
                               (let [vertices (get m k)]
                                 (if (empty? vertices)
-                                  [(ast/end)]
+                                  [(ast/skip)]
                                   (mapv #(assoc ast :v %) vertices))))
                             (keys m))]
               (if (nil? (keys m))
@@ -376,6 +397,7 @@
              :cat ast/cat
              :alt ast/alt
              :par ast/par
+             :async ast/async
              (throw (Exception.)))
          ith (nth branches i)
          ith-before (subvec branches 0 i)

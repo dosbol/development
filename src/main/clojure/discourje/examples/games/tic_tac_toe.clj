@@ -13,15 +13,25 @@
 (s/defrole ::alice)
 (s/defrole ::bob)
 
-(s/defsession ::tic-tac-toe []
-  (s/alt (::tic-tac-toe-turn ::alice ::bob)
-         (::tic-tac-toe-turn ::bob ::alice)))
+(s/defsession ::tic-tac-toe-unbuffered []
+  (s/alt (::tic-tac-toe-turn-unbuffered ::alice ::bob)
+         (::tic-tac-toe-turn-unbuffered ::bob ::alice)))
 
-(s/defsession ::tic-tac-toe-turn [r1 r2]
-  (s/--> Long r1 r2)
-  (s/alt (::tic-tac-toe-turn r2 r1)
-         (s/par (s/close r1 r2)
-                (s/close r2 r1))))
+(s/defsession ::tic-tac-toe-turn-unbuffered [r1 r2]
+  (s/cat (s/--> Long r1 r2)
+         (s/alt (::tic-tac-toe-turn-unbuffered r2 r1)
+                (s/par (s/close r1 r2)
+                       (s/close r2 r1)))))
+
+(s/defsession ::tic-tac-toe-buffered []
+  (s/alt (::tic-tac-toe-turn-buffered ::alice ::bob)
+         (::tic-tac-toe-turn-buffered ::bob ::alice)))
+
+(s/defsession ::tic-tac-toe-turn-buffered [r1 r2]
+  (s/async (s/-->> Long r1 r2)
+           (s/alt (::tic-tac-toe-turn-buffered r2 r1)
+                  (s/par (s/close r1 r2)
+                         (s/close r2 r1)))))
 
 ;;;;
 ;;;; Implementation
@@ -72,19 +82,20 @@
   (println))
 
 (let [input config/*input*
-      _ (:resolution input)]
+      _ (:resolution input)
+      buffered (:buffered input)]
 
   (let [;; Start timer
         begin (System/nanoTime)
 
         ;; Create channels
-        a->b (a/chan)
-        b->a (a/chan)
+        a->b (if buffered (a/chan 1) (a/chan))
+        b->a (if buffered (a/chan 1) (a/chan))
 
         ;; Link monitor [optional]
         _
         (if (= config/*lib* :dcj)
-          (let [s (tic-tac-toe)
+          (let [s (if buffered (tic-tac-toe-buffered) (tic-tac-toe-unbuffered))
                 m (a/monitor s)]
             (a/link a->b alice bob m)
             (a/link b->a bob alice m)))

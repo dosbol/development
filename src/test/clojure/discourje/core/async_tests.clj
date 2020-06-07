@@ -44,7 +44,7 @@
         dcj (dcj/close! (dcj/chan))]
     (is (= clj dcj)))
 
-  (let [m (a/monitor (s/end))
+  (let [m (a/monitor (s/skip))
         c (a/chan (s/role ::alice) (s/role ::bob) m {})]
     (is (thrown? RuntimeException (a/close! c))))
 
@@ -59,7 +59,7 @@
         dcj (dcj/close! (dcj/chan 1))]
     (is (= clj dcj)))
 
-  (let [m (a/monitor (s/end))
+  (let [m (a/monitor (s/skip))
         c (a/chan 1 (s/role ::alice) (s/role ::bob) m {})]
     (is (thrown? RuntimeException (a/close! c))))
 
@@ -93,7 +93,7 @@
     (is (not-failed? t1))
     (is (not-failed? t2 "foo")))
 
-  (let [m (a/monitor (s/end))
+  (let [m (a/monitor (s/skip))
         c (a/chan (s/role ::alice) (s/role ::bob) m {})
         t1 (a/thread (no-throw (a/>!! c "foo")))
         t2 (a/thread (no-throw (a/<!! c)))]
@@ -122,7 +122,7 @@
     (is (not-failed? t1))
     (is (not-failed? t2 "foo")))
 
-  (let [m (a/monitor (s/end))
+  (let [m (a/monitor (s/skip))
         c (a/chan 1 (s/role ::alice) (s/role ::bob) m {})
         t1 (a/thread (no-throw (a/>!! c "foo")))
         t2 (a/thread (no-throw 3.14))]
