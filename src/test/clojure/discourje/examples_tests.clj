@@ -107,16 +107,26 @@
 
   ;; Rock-Paper-Scissors
 
+  ;(print (main/run-all [:clj :dcj]
+  ;                     ['discourje.examples.games.rock-paper-scissors]
+  ;                     {:buffered [true] :k [3]}))
+  ;(is true)
+
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.rock-paper-scissors]
-                       {:k [3]}))
+                       {:buffered [false] :k [3]}))
   (is true)
 
   ;; Go Fish
 
   (print (main/run-all [:clj :dcj]
                        ['discourje.examples.games.go-fish]
-                       {:k [3]}))
+                       {:buffered [true] :k [3]}))
+  (is true)
+
+  (print (main/run-all [:clj :dcj]
+                       ['discourje.examples.games.go-fish]
+                       {:buffered [false] :k [3]}))
   (is true))
 
 (deftest npb3-tests

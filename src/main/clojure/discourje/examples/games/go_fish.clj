@@ -29,13 +29,13 @@
 (s/defrole ::dealer)
 (s/defrole ::player)
 
-(s/defsession ::go-fish [player-ids]
+(s/defsession ::go-fish-unbuffered [player-ids]
   (s/cat (s/par-every [i player-ids]
            (s/cat-every [_ (range 5)]
              (s/--> Card ::dealer (::player i))))
          (s/alt-every [i player-ids]
            (s/cat (s/--> Turn ::dealer (::player i))
-                  (::go-fish-turn i player-ids)))
+                  (::go-fish-turn-unbuffered i player-ids)))
          (s/par-every [i player-ids]
            (s/cat (s/close ::dealer (::player i))
                   (s/par (s/cat (s/* (s/--> Card (::player i) ::dealer))
@@ -43,19 +43,47 @@
                          (s/par-every [j (disj player-ids i)]
                            (s/close (::player i) (::player j))))))))
 
-(s/defsession ::go-fish-turn [i player-ids]
+(s/defsession ::go-fish-turn-unbuffered [i player-ids]
   (s/alt-every [j (disj player-ids i)]
     (s/cat (s/--> Ask (::player i) (::player j))
            (s/alt (s/cat (s/--> Card (::player j) (::player i))
                          (s/--> OutOfCards (::player i) ::dealer))
                   (s/cat (s/--> Card (::player j) (::player i))
-                         (::go-fish-turn i player-ids))
+                         (::go-fish-turn-unbuffered i player-ids))
                   (s/cat (s/--> Go (::player j) (::player i))
                          (s/--> Fish (::player i) ::dealer)
                          (s/alt (s/--> Card ::dealer (::player i))
                                 (s/--> OutOfCards ::dealer (::player i)))
                          (s/--> Turn (::player i) (::player j))
-                         (::go-fish-turn j player-ids))))))
+                         (::go-fish-turn-unbuffered j player-ids))))))
+
+(s/defsession ::go-fish-buffered [player-ids]
+  (s/async (s/par-every [i player-ids]
+             (s/cat-every [_ (range 5)]
+               (s/-->> Card ::dealer (::player i))))
+           (s/cat (s/alt-every [i player-ids]
+                    (s/cat (s/-->> Turn ::dealer (::player i))
+                           (::go-fish-turn-buffered i player-ids)))
+                  (s/par-every [i player-ids]
+                    (s/cat (s/close ::dealer (::player i))
+                           (s/par (s/async* (s/-->> Card (::player i) ::dealer)
+                                            (s/close (::player i) ::dealer))
+                                  (s/par-every [j (disj player-ids i)]
+                                    (s/close (::player i) (::player j)))))))))
+
+(s/defsession ::go-fish-turn-buffered [i player-ids]
+  (s/alt-every [j (disj player-ids i)]
+    (s/cat (s/-->> Ask (::player i) (::player j))
+           (s/alt (s/cat (s/-->> Card (::player j) (::player i))
+                         (s/-->> OutOfCards (::player i) ::dealer))
+                  (s/cat (s/-->> Card (::player j) (::player i))
+                         (::go-fish-turn-buffered i player-ids))
+                  (s/cat (s/-->> Go (::player j) (::player i))
+                         (s/-->> Fish (::player i) ::dealer)
+                         (s/alt (s/-->> Card ::dealer (::player i))
+                                (s/-->> OutOfCards ::dealer (::player i)))
+                         (s/-->> Turn (::player i) (::player j))
+                         (::go-fish-turn-buffered j player-ids))))))
 
 ;;;;
 ;;;; Implementation
@@ -119,6 +147,7 @@
 
 (let [input config/*input*
       _ (:resolution input)
+      buffered (:buffered input)
       k (:k input)]
 
   (let [;; Start timer
@@ -126,14 +155,14 @@
 
         ;; Create channels
         dealer<->players
-        (u/star a/chan nil (range k))
+        (u/star (if buffered (fn [] (a/chan 1)) a/chan) nil (range k))
         players<->players
-        (u/mesh a/chan (range k))
+        (u/mesh (if buffered (fn [] (a/chan 1)) a/chan) (range k))
 
         ;; Link monitor [optional]
         _
         (if (= config/*lib* :dcj)
-          (let [s (go-fish (set (range k)))
+          (let [s ((if buffered go-fish-buffered go-fish-unbuffered) (set (range k)))
                 m (a/monitor s)]
             (u/link-star dealer<->players dealer player m)
             (u/link-mesh players<->players player m)))
