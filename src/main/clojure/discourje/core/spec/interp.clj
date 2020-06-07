@@ -85,7 +85,7 @@
     :close (w/postwalk-replace smap ast)
 
     ;; Nullary operators
-    :end ast
+    :skip ast
 
     ;; Multiary operators
     :cat (ast/cat (mapv #(substitute % smap) (:branches ast)))
@@ -127,7 +127,7 @@
     :close ast
 
     ;; Nullary operators
-    :end ast
+    :skip ast
 
     ;; Multiary operators
     :cat (ast/cat (mapv #(unfold % ast-loop) (:branches ast)))
@@ -171,7 +171,7 @@
     :close (throw (Exception.))
 
     ;; Nullary operators
-    :end (throw (Exception.))
+    :skip (throw (Exception.))
 
     ;; Concatenation
     :cat (throw (Exception.))
@@ -232,7 +232,7 @@
     :close #{(:sender ast)}
 
     ;; Nullary operators
-    :end #{}
+    :skip #{}
 
     ;; Multiary operators
     :cat (reduce into (map #(subjects %) (:branches ast)))
@@ -265,7 +265,7 @@
     :close false
 
     ;; Nullary operators
-    :end true
+    :skip true
 
     ;; Multiary operators
     :cat (every? #(terminated? % unfolded) (:branches ast))
@@ -298,13 +298,13 @@
    (case (:type ast)
 
      ;; Actions
-     :sync {ast [(ast/end)]}
-     :send {ast [(ast/end)]}
-     :receive {ast [(ast/end)]}
-     :close {ast [(ast/end)]}
+     :sync {ast [(ast/skip)]}
+     :send {ast [(ast/skip)]}
+     :receive {ast [(ast/skip)]}
+     :close {ast [(ast/skip)]}
 
      ;; Nullary operators
-     :end {}
+     :skip {}
 
      ;; Multiary operators
      :cat (let [branches (:branches ast)]
@@ -378,7 +378,7 @@
                   vals (map (fn [k]
                               (let [vertices (get m k)]
                                 (if (empty? vertices)
-                                  [(ast/end)]
+                                  [(ast/skip)]
                                   (mapv #(assoc ast :v %) vertices))))
                             (keys m))]
               (if (nil? (keys m))

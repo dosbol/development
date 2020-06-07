@@ -223,7 +223,7 @@
 (deftest async*-tests
   (let [lts1 (lts/lts (s/async* (s/async (s/-->> ::alice ::bob)
                                          (s/-->> ::bob ::alice))
-                                (s/end)))
+                                (s/skip)))
         lts2 (lts/lts (s/graph des (0, 5, 5)
                                (0, "!(Object,alice,bob)", 1)
                                (1, "?(alice,bob)", 2)
@@ -237,7 +237,7 @@
 (deftest async+-tests
   (let [lts1 (lts/lts (s/async+ (s/async (s/-->> ::alice ::bob)
                                          (s/-->> ::bob ::alice))
-                                (s/end)))
+                                (s/skip)))
         lts2 (lts/lts (s/graph des (0, 5, 5)
                                (0, "!(Object,alice,bob)", 1)
                                (1, "?(alice,bob)", 2)
@@ -660,7 +660,7 @@
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
 
   (let [lts1 (lts/lts (s/async (s/alt (s/-->> ::alice ::bob)
-                                      (s/end))
+                                      (s/skip))
                                (s/-->> ::alice ::carol)))
         lts2 (lts/lts (s/graph des (0, 9, 7)
                                (0, "!(Object,alice,bob)", 1)

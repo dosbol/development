@@ -105,8 +105,8 @@
 
 (defrecord Nullary [type])
 
-(defn end []
-  (->Nullary :end))
+(defn skip []
+  (->Nullary :skip))
 
 ;;;;
 ;;;; Multiary operators

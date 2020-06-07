@@ -124,9 +124,9 @@
 ;;;; Nullary operators
 ;;;;
 
-(defmacro end
+(defmacro skip
   []
-  `(ast/end))
+  `(ast/skip))
 
 (defmacro any
   [roles]
@@ -149,31 +149,31 @@
 
 (defmacro *
   ([body]
-   `(* ~body (end)))
+   `(* ~body (skip)))
   ([body continuation]
    (clojure.core/let [name `*#]
      `(loop ~name [] (alt (cat ~body (s/recur ~name)) ~continuation)))))
 
 (defmacro +
   ([body]
-   `(+ ~body (end)))
+   `(+ ~body (skip)))
   ([body continuation]
    `(cat ~body (* ~body ~continuation))))
 
 (defmacro ?
   [body]
-  `(alt ~body (end)))
+  `(alt ~body (skip)))
 
 (defmacro async*
   ([body]
-   `(async* ~body (end)))
+   `(async* ~body (skip)))
   ([body continuation]
    (clojure.core/let [name `*#]
      `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation)))))
 
 (defmacro async+
   ([body]
-   `(async+ ~body (end)))
+   `(async+ ~body (skip)))
   ([body continuation]
    `(async ~body (async* ~body ~continuation))))
 
@@ -195,7 +195,7 @@
 (defn- multiary [f branches]
   (clojure.core/let [branches (mapv (comp macroexpand desugared-spec) branches)]
     (case (clojure.core/count branches)
-      0 `(end)
+      0 `(skip)
       1 (first branches)
       `(~f ~branches))))
 
@@ -241,7 +241,7 @@
 
 (defmacro if
   ([test-expr then]
-   `(s/if ~test-expr ~then (end)))
+   `(s/if ~test-expr ~then (skip)))
   ([test-expr then else]
    (clojure.core/let [then (macroexpand (desugared-spec then))
                       else (macroexpand (desugared-spec else))]
