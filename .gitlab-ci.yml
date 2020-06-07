@@ -31,22 +31,24 @@ test:
 build-discourje:
   stage: build_stage
   script:
-    - lein with-profile discourje uberjar
+    - lein uberjar
   artifacts:
     paths:
-      - /builds/ruben.hamers/Discourje/target/discourje.jar
+      - /builds/ruben.hamers/Discourje/target/discourje-2.0.0.jar
+      - /builds/ruben.hamers/Discourje/target/discourje-2.0.0-standalone.jar
     expire_in: 1 week
   only:
     - master
     - develop
 
-build-tacas:
+build-examples:
   stage: build_stage
   script:
     - lein with-profile tacas2020 uberjar
   artifacts:
     paths:
-      - /builds/ruben.hamers/Discourje/target/tacas2020.jar
+      - /builds/ruben.hamers/Discourje/target/discourje-2.0.0.jar
+      - /builds/ruben.hamers/Discourje/target/discourje-examples.jar
     expire_in: 1 week
   only:
     - master

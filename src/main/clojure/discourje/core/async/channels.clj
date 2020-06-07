@@ -34,7 +34,7 @@
   (getReceiver [_] receiver)
   (setReceiver [_ newReceiver] (set! receiver newReceiver))
 
-  MutableMonitor
+  MutableMonitor/outdated
   (getMonitor [_] monitor)
   (setMonitor [_ newMonitor] (set! monitor newMonitor)))
 
