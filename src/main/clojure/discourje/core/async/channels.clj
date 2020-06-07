@@ -265,13 +265,18 @@
                                   alternative
                                   (recur (rest todo)))))))))]
 
-    (if (nil? alternative)
-      [val :default]
+    (if alternative
       (if (vector? alternative)
-        (let [channel (first alternative)]
-          [(>!!-step2 channel (second alternative)) channel])
+        (let [channel (first alternative)
+              message (second alternative)]
+          (if val
+            [(>!!-step2 channel message) channel]
+            [nil channel]))
         (let [channel alternative]
-          [(<!!-step2 channel) channel])))))
+          (if val
+            [(<!!-step2 channel) channel]
+            [nil channel])))
+      [val :default])))
 
 ;;;;
 ;;;; put! and take!
