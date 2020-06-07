@@ -148,28 +148,6 @@
 ;;;; Unary operators
 ;;;;
 
-(deftest ω-tests
-  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
-        lts2 (lts/lts (s/graph des (0, 2, 2)
-                               (0, "!(Object,alice,bob)", 1)
-                               (1, "?(alice,bob)", 0)))]
-    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
-
-  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
-        lts2 (lts/lts (s/cat (s/ω (s/-->> ::alice ::bob))
-                             (s/-->> ::alice ::carol)))]
-    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
-
-  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
-        lts2 (lts/lts (s/ω (s/ω (s/-->> ::alice ::bob))))]
-    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
-
-  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
-        lts2 (lts/lts (s/omega (s/-->> ::alice ::bob)))]
-    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2))))
-
-(ω-tests)
-
 (deftest *-tests
   (let [lts1 (lts/lts (s/* (s/-->> ::alice ::bob)))
         lts2 (lts/lts (s/graph des (0, 2, 2)
@@ -186,8 +164,8 @@
                                (2, "?(alice,carol)", 3)))]
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
 
-  (let [lts1 (lts/lts (s/* (s/* (s/-->> ::alice ::bob))
-                           (s/-->> ::alice ::carol)))
+  (let [lts1 (lts/lts (s/* (s/cat (s/* (s/-->> ::alice ::bob))
+                                  (s/-->> ::alice ::carol))))
         lts2 (lts/lts (s/graph des (0, 4, 3)
                                (0, "!(Object,alice,bob)", 1)
                                (1, "?(alice,bob)", 0)
@@ -214,8 +192,8 @@
                                (2, "!(Object,alice,bob)", 1)))]
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
 
-  (let [lts1 (lts/lts (s/+ (s/-->> ::alice ::bob)
-                           (s/-->> ::alice ::bob)))
+  (let [lts1 (lts/lts (s/+ (s/cat (s/-->> ::alice ::bob)
+                                  (s/-->> ::alice ::bob))))
         lts2 (lts/lts (s/cat (s/-->> ::alice ::bob)
                              (s/+ (s/-->> ::alice ::bob))))]
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
@@ -241,6 +219,41 @@
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2))))
 
 (?-tests)
+
+(deftest async*-tests
+  (let [lts1 (lts/lts (s/async* (s/async (s/-->> ::alice ::bob)
+                                         (s/-->> ::bob ::alice))
+                                (s/end)))
+        lts2 (lts/lts (s/graph des (0, 5, 5)
+                               (0, "!(Object,alice,bob)", 1)
+                               (1, "?(alice,bob)", 2)
+                               (2, "!(Object,bob,alice)", 3)
+                               (3, "?(bob,alice)", 4)
+                               (4, "!(Object,alice,bob)", 1)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
+  (async*-tests))
+
+(deftest ω-tests
+  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
+        lts2 (lts/lts (s/graph des (0, 2, 2)
+                               (0, "!(Object,alice,bob)", 1)
+                               (1, "?(alice,bob)", 0)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
+
+  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
+        lts2 (lts/lts (s/cat (s/ω (s/-->> ::alice ::bob))
+                             (s/-->> ::alice ::carol)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
+
+  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
+        lts2 (lts/lts (s/ω (s/ω (s/-->> ::alice ::bob))))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
+
+  (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
+        lts2 (lts/lts (s/omega (s/-->> ::alice ::bob)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2))))
+
+(ω-tests)
 
 ;;;;
 ;;;; Multiary operators
@@ -623,6 +636,21 @@
                                (20, "?(alice,carol)", 7)))]
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
 
+  (let [lts1 (lts/lts (s/async (s/alt (s/-->> ::alice ::bob)
+                                      (s/end))
+                               (s/-->> ::alice ::carol)))
+        lts2 (lts/lts (s/graph des (0, 12, 9)
+                               (0, "!(Object,alice,bob)", 1)
+                               (0, "!(Object,alice,carol)", 2)
+                               (1, "?(alice,bob)", 3)
+                               (1, "!(Object,alice,carol)", 4)
+                               (2, "?(alice,carol)", 6)
+                               (3, "!(Object,alice,carol)", 2)
+                               (4, "?(alice,bob)", 2)
+                               (4, "?(alice,carol)", 5)
+                               (5, "?(alice,bob)", 6)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
+
   (let [lts1 (lts/lts (s/async (s/-->> ::alice ::bob)
                                (s/-->> ::carol ::dave)))
         lts2 (lts/lts (s/par (s/-->> ::alice ::bob)
@@ -662,7 +690,7 @@
 
   (let [lts1 (lts/lts (s/cat-every [i (range 2)
                                     j (range 2)]
-                        (s/-->> (::alice i) (::bob j))))
+                                   (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/cat (s/-->> (::alice 0) (::bob 0))
                              (s/-->> (::alice 0) (::bob 1))
                              (s/-->> (::alice 1) (::bob 0))
@@ -671,7 +699,7 @@
 
   (let [lts1 (lts/lts (s/cat-every [i (range 3)
                                     j (range i)]
-                        (s/-->> (::alice i) (::bob j))))
+                                   (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/cat (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]
@@ -698,7 +726,7 @@
 
   (let [lts1 (lts/lts (s/alt-every [i (range 2)
                                     j (range 2)]
-                        (s/-->> (::alice i) (::bob j))))
+                                   (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/alt (s/-->> (::alice 0) (::bob 0))
                              (s/-->> (::alice 0) (::bob 1))
                              (s/-->> (::alice 1) (::bob 0))
@@ -707,7 +735,7 @@
 
   (let [lts1 (lts/lts (s/alt-every [i (range 3)
                                     j (range i)]
-                        (s/-->> (::alice i) (::bob j))))
+                                   (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/alt (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]
@@ -742,7 +770,7 @@
 
   (let [lts1 (lts/lts (s/par-every [i (range 3)
                                     j (range i)]
-                        (s/-->> (::alice i) (::bob j))))
+                                   (s/-->> (::alice i) (::bob j))))
         lts2 (lts/lts (s/par (s/-->> (::alice 1) (::bob 0))
                              (s/-->> (::alice 2) (::bob 0))
                              (s/-->> (::alice 2) (::bob 1))))]

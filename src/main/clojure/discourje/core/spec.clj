@@ -1,6 +1,6 @@
 (ns discourje.core.spec
   (:gen-class)
-  (:refer-clojure :exclude [if do let loop cat * + apply count empty? disj])
+  (:refer-clojure :exclude [if do let loop cat * + count empty? disj])
   (:require [clojure.walk :as w]
             [discourje.core.spec.ast :as ast]))
 
@@ -147,27 +147,32 @@
 ;;;; Unary operators
 ;;;;
 
-(defmacro ω
-  [& body]
-  (clojure.core/let [name `ω#]
-    `(loop ~name [] ~@body (s/recur ~name))))
-
-(defmacro omega
-  [& body]
-  `(ω ~@body))
-
 (defmacro *
-  [& body]
+  [body]
   (clojure.core/let [name `*#]
-    `(loop ~name [] (alt (cat ~@body (s/recur ~name)) (end)))))
+    `(loop ~name [] (alt (cat ~body (s/recur ~name)) (end)))))
 
 (defmacro +
-  [& body]
-  `(cat ~@body (* ~@body)))
+  [body]
+  `(cat ~body (* ~body)))
 
 (defmacro ?
-  [& body]
-  `(alt (cat ~@body) (end)))
+  [body]
+  `(alt (cat ~body) (end)))
+
+(defmacro async*
+  [body continuation]
+  (clojure.core/let [name `*#]
+    `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation))))
+
+(defmacro ω
+  [body]
+  (clojure.core/let [name `ω#]
+    `(loop ~name [] ~body (s/recur ~name))))
+
+(defmacro omega
+  [body]
+  `(ω ~body))
 
 ;;;;
 ;;;; Multiary operators
@@ -281,16 +286,16 @@
     `(ast/put-ast! ~k (w/postwalk-replace ~(smap &env) '~vars) ~body)))
 
 (s/defsession ::-->>not [t r1 r2]
-              (s/-->> (fn [x] (not= (type x) t)) r1 r2))
+  (s/-->> (fn [x] (not= (type x) t)) r1 r2))
 
 (s/defsession ::pipe [t r-name min max]
-              (s/loop pipe [i min]
-                      (s/if (< i (dec max))
-                        (s/cat (s/-->> t (r-name i) (r-name (inc i)))
-                               (s/recur pipe (inc i))))))
+  (s/loop pipe [i min]
+          (s/if (< i (dec max))
+            (s/cat (s/-->> t (r-name i) (r-name (inc i)))
+                   (s/recur pipe (inc i))))))
 
 (s/defsession ::pipe [t r-name n]
-              (s/session ::pipe ['t r-name 0 n]))
+  (s/session ::pipe ['t r-name 0 n]))
 
 ;;;;
 ;;;; Set operations (convenience)
