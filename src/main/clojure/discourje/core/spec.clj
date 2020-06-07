@@ -158,12 +158,16 @@
 
 (defmacro ?
   [body]
-  `(alt (cat ~body) (end)))
+  `(alt ~body (end)))
 
 (defmacro async*
   [body continuation]
   (clojure.core/let [name `*#]
     `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation))))
+
+(defmacro async+
+  [body continuation]
+  `(async ~body (async* ~body ~continuation)))
 
 (defmacro ω
   [body]

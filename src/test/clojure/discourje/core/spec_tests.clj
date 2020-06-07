@@ -230,8 +230,31 @@
                                (2, "!(Object,bob,alice)", 3)
                                (3, "?(bob,alice)", 4)
                                (4, "!(Object,alice,bob)", 1)))]
+    (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2))))
+
+(async*-tests)
+
+(deftest async+-tests
+  (let [lts1 (lts/lts (s/async+ (s/async (s/-->> ::alice ::bob)
+                                         (s/-->> ::bob ::alice))
+                                (s/end)))
+        lts2 (lts/lts (s/graph des (0, 5, 5)
+                               (0, "!(Object,alice,bob)", 1)
+                               (1, "?(alice,bob)", 2)
+                               (2, "!(Object,bob,alice)", 3)
+                               (3, "?(bob,alice)", 4)
+                               (4, "!(Object,alice,bob)", 1)))]
     (is (lts/bisimilar? lts1 lts2) (msg lts1 lts2)))
-  (async*-tests))
+
+  (let [lts1 (lts/lts (s/async* (s/async (s/-->> ::alice ::bob)
+                                         (s/-->> ::bob ::alice))
+                                (s/-->> ::alice ::carol)))
+        lts2 (lts/lts (s/async+ (s/async (s/-->> ::alice ::bob)
+                                         (s/-->> ::bob ::alice))
+                                (s/-->> ::alice ::carol)))]
+    (is (lts/not-bisimilar? lts1 lts2) (msg lts1 lts2))))
+
+(async*-tests)
 
 (deftest ω-tests
   (let [lts1 (lts/lts (s/ω (s/-->> ::alice ::bob)))
