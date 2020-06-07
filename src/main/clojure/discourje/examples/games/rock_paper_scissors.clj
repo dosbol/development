@@ -13,20 +13,35 @@
 
 (s/defrole ::player)
 
-(s/defsession ::rock-paper-scissors [ids]
-  (::rock-paper-scissors-round ids s/empty-set))
+(s/defsession ::rock-paper-scissors-unbuffered [ids]
+  (::rock-paper-scissors-round-unbuffered ids s/empty-set))
 
-(s/defsession ::rock-paper-scissors-round [ids co-ids]
+(s/defsession ::rock-paper-scissors-round-unbuffered [ids co-ids]
   (s/if (> (s/count ids) 1)
     (s/cat (s/par-every [i ids
                          j (s/disj ids i)]
              (s/--> String (::player i) (::player j)))
            (s/alt-every [winner-ids (s/power-set ids)]
              (s/let [loser-ids (s/difference ids winner-ids)]
-               (s/par (::rock-paper-scissors-round winner-ids (s/union co-ids loser-ids))
-                      (s/par-every [i loser-ids
-                                    j (s/disj (s/union ids co-ids) i)]
-                        (s/close (::player i) (::player j)))))))))
+                    (s/par (::rock-paper-scissors-round-unbuffered winner-ids (s/union co-ids loser-ids))
+                           (s/par-every [i loser-ids
+                                         j (s/disj (s/union ids co-ids) i)]
+                             (s/close (::player i) (::player j)))))))))
+
+(s/defsession ::rock-paper-scissors-buffered [ids]
+  (::rock-paper-scissors-round-buffered ids s/empty-set))
+
+(s/defsession ::rock-paper-scissors-round-buffered [ids co-ids]
+  (s/if (> (s/count ids) 1)
+    (s/async (s/par-every [i ids
+                           j (s/disj ids i)]
+               (s/-->> String (::player i) (::player j)))
+             (s/alt-every [winner-ids (s/power-set ids)]
+               (s/let [loser-ids (s/difference ids winner-ids)]
+                      (s/par (::rock-paper-scissors-round-buffered winner-ids (s/union co-ids loser-ids))
+                             (s/par-every [i loser-ids
+                                           j (s/disj (s/union ids co-ids) i)]
+                               (s/close (::player i) (::player j)))))))))
 
 ;;;;
 ;;;; Implementation
@@ -73,6 +88,7 @@
 
 (let [input config/*input*
       _ (:resolution input)
+      buffered (:buffered input)
       k (:k input)]
 
   (let [;; Start timer
@@ -80,16 +96,16 @@
 
         ;; Create channels
         players<->players
-        (u/mesh a/chan (range k))
+        (u/mesh (if buffered (fn [] (a/chan 1)) a/chan) (range k))
 
         ;; Create barrier
         barrier
-        (java.util.concurrent.Phaser. k)
+        (if buffered nil (java.util.concurrent.Phaser. k))
 
         ;; Link monitor [optional]
         _
         (if (= config/*lib* :dcj)
-          (let [s (rock-paper-scissors (set (range k)))
+          (let [s ((if buffered rock-paper-scissors-buffered rock-paper-scissors-unbuffered) (set (range k)))
                 m (a/monitor s)]
             (u/link-mesh players<->players player m)))
 
@@ -109,13 +125,13 @@
                                                     (recur (remove #{[c item] c} acts)
                                                            (assoc round (u/putter-id players<->players c) v)))))]
 
-                                    (.arriveAndAwaitAdvance barrier)
+                                    (if barrier (.arriveAndAwaitAdvance barrier))
 
                                     (if (winner? round i)
                                       (println-rounds (conj rounds round)))
 
                                     (if (winner-or-loser? round i)
-                                      (do (.arriveAndDeregister barrier)
+                                      (do (if barrier (.arriveAndDeregister barrier))
                                           (doseq [j (remove #{i} (range k))]
                                             (a/close! (players<->players i j))))
                                       (recur (winner-ids round) (conj rounds round)))))))
