@@ -38,8 +38,8 @@
                   (::go-fish-turn-unbuffered i player-ids)))
          (s/par-every [i player-ids]
            (s/cat (s/close ::dealer (::player i))
-                  (s/par (s/cat (s/* (s/--> Card (::player i) ::dealer))
-                                (s/close (::player i) ::dealer))
+                  (s/par (s/* (s/--> Card (::player i) ::dealer)
+                              (s/close (::player i) ::dealer))
                          (s/par-every [j (disj player-ids i)]
                            (s/close (::player i) (::player j))))))))
 

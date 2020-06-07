@@ -148,26 +148,34 @@
 ;;;;
 
 (defmacro *
-  [body]
-  (clojure.core/let [name `*#]
-    `(loop ~name [] (alt (cat ~body (s/recur ~name)) (end)))))
+  ([body]
+   `(* ~body (end)))
+  ([body continuation]
+   (clojure.core/let [name `*#]
+     `(loop ~name [] (alt (cat ~body (s/recur ~name)) ~continuation)))))
 
 (defmacro +
-  [body]
-  `(cat ~body (* ~body)))
+  ([body]
+   `(+ ~body (end)))
+  ([body continuation]
+   `(cat ~body (* ~body ~continuation))))
 
 (defmacro ?
   [body]
   `(alt ~body (end)))
 
 (defmacro async*
-  [body continuation]
-  (clojure.core/let [name `*#]
-    `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation))))
+  ([body]
+   `(async* ~body (end)))
+  ([body continuation]
+   (clojure.core/let [name `*#]
+     `(loop ~name [] (alt (async ~body (s/recur ~name)) ~continuation)))))
 
 (defmacro async+
-  [body continuation]
-  `(async ~body (async* ~body ~continuation)))
+  ([body]
+   `(async+ ~body (end)))
+  ([body continuation]
+   `(async ~body (async* ~body ~continuation))))
 
 (defmacro ω
   [body]
