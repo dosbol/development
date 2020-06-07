@@ -84,7 +84,7 @@
     :receive (w/postwalk-replace smap ast)
     :close (w/postwalk-replace smap ast)
 
-    ;; Unary operators
+    ;; Nullary operators
     :end ast
 
     ;; Multiary operators
@@ -231,9 +231,8 @@
     :receive #{(:receiver ast)}
     :close #{(:sender ast)}
 
-    ;; Unary operators
-    (= (:type ast) :end)
-    #{}
+    ;; Nullary operators
+    :end #{}
 
     ;; Multiary operators
     :cat (reduce into (map #(subjects %) (:branches ast)))
@@ -244,8 +243,10 @@
 
     ;; "Special forms" operators
     :if (subjects (eval-ast ast))
-    :loop (subjects (eval-ast ast))
-    :recur (throw (Exception.))
+    :loop (if (empty? (:vars ast))
+            (subjects (:body ast))
+            (throw (Exception.)))
+    :recur #{}
 
     ;; Misc operators
     :graph (throw (Exception.))
@@ -334,28 +335,34 @@
                 (if (= i (count branches'))
                   m
                   (recur (inc i) (merge-with into m (successors ast' i unfolded)))))))
-     :async (let [branches (:branches ast)
-                  branches' (loop [branches branches]
-                              (if (empty? branches)
-                                [(ast/end)]
-                                (if (empty? (successors (first branches) unfolded))
-                                  (recur (rest branches))
-                                  (vec branches))))
-                  ast' (ast/async branches')]
-              (case (count branches')
-                0 {}
-                1 (successors (first branches') unfolded)
-                (loop [i 0
-                       roles #{}
-                       m {}]
-                  (if (= i (count branches'))
-                    m
-                    (recur (inc i)
-                           (union roles (if (< i (dec (count branches')))
-                                          (subjects (nth branches' i))
-                                          #{}))
-                           (merge-with into m (filter (fn [[ast-action _]] (empty? (intersection roles (subjects ast-action))))
-                                                      (successors ast' i unfolded))))))))
+
+     :async (let [branches (:branches ast)]
+              (if (empty? branches)
+                {}
+                (reduce (partial merge-with into)
+                        [;; Rule 1
+                         (successors ast 0 unfolded)
+                         ;; Rule 2
+                         (let [branch (first branches)
+                               branches-after (rest branches)]
+                           (if (terminated? branch #{})
+                             (case (count branches-after)
+                               0 {}
+                               1 (successors (first branches-after) unfolded)
+                               (successors (ast/async (vec branches-after)) unfolded))
+                             {}))
+                         ; Rule 3
+                         (let [branch (first branches)
+                               branches-after (rest branches)
+                               roles (subjects branch)]
+                           (if (not (empty? (successors branch unfolded)))
+                             (filter (fn [[ast-action _]] (empty? (intersection roles (subjects ast-action))))
+                                     (case (count branches-after)
+                                       0 {}
+                                       1 (successors ast 1 unfolded)
+                                       (successors (ast/async [branch (ast/async (vec branches-after))]) 1 unfolded)))
+                             {}))
+                         ])))
      :every (successors (eval-ast ast) unfolded)
 
      ;; "Special forms" operators
