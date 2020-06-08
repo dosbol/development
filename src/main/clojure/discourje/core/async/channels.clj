@@ -38,18 +38,26 @@
   (getMonitor [_] monitor)
   (setMonitor [_ newMonitor] (set! monitor newMonitor)))
 
-(defn channel? [x]
+(defn channel?
+  "Check whether x is of type Channel"
+  [x]
   (= (type x) Channel))
 
-(defn- channel [buffered ch ch-ghost1 ch-ghost2]
+(defn- channel
+  "Create a channel"
+  [buffered ch ch-ghost1 ch-ghost2]
   {:pre []}
   (->Channel buffered ch ch-ghost1 ch-ghost2 nil nil nil))
 
-(defn unbuffered-channel []
+(defn unbuffered-channel
+  "Create an unbuffered channel"
+  []
   {:pre []}
   (channel false (a/chan) (a/chan) nil))
 
-(defn buffered-channel [buffer]
+(defn buffered-channel
+  "Create a buffered channel of the given buffer type"
+  [buffer]
   {:pre [(buffers/buffer? buffer)]}
   (let [chan (fn [buffer]
                (case (buffers/type buffer)
@@ -59,7 +67,9 @@
                  :promise-buffer (throw (IllegalArgumentException.))))]
     (channel true (chan buffer) (chan buffer) (chan buffer))))
 
-(defn link [this r1 r2 m]
+(defn link
+  "Link sender, receiver and monitor to a channel"
+  [this r1 r2 m]
   {:pre [(channel? this)
          (or (ast/role? r1) (fn? r1))
          (or (ast/role? r2) (fn? r2))
@@ -77,6 +87,7 @@
 ;;;;
 
 (defn close!
+  "Verify and Close a channel"
   [channel]
   {:pre [(channel? channel)]}
 
@@ -115,11 +126,13 @@
 ;;;;
 
 (defn- >!!-step1
+  "Put step1, on first channel"
   [channel]
   {:pre [(channel? channel)]}
   (a/>!! (.-ch_ghost1 channel) token))
 
 (defn- >!!-step2
+  "Put step2, on `real' channel, and set the token on the third channel."
   [channel message]
   {:pre [(channel? channel)]}
   (if (.-buffered channel)
@@ -161,12 +174,14 @@
             (throw result))))))
 
 (defn >!!
+  "Put a message on a channel"
   [channel message]
   {:pre [(channel? channel)]}
   (if (>!!-step1 channel)
     (>!!-step2 channel message)))
 
 (defn <!!-step1
+  "Take step 1, on thrid channel"
   [channel]
   {:pre [(channel? channel)]}
   (if (.-buffered channel)
@@ -174,6 +189,7 @@
     (a/<!! (.-ch_ghost1 channel))))
 
 (defn <!!-step2
+  "Take on `real' channel, and clear token on first channel"
   [channel]
   {:pre [(channel? channel)]}
   (if (.-buffered channel)
@@ -203,6 +219,7 @@
         message))))
 
 (defn <!!
+  "Take from a channel"
   [channel]
   {:pre [(channel? channel)]}
   (if (<!!-step1 channel)

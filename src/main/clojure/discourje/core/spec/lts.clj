@@ -9,7 +9,9 @@
 ;;;; Actions
 ;;;;
 
-(defn- action-type-keyword-to-enum [keyword]
+(defn- action-type-keyword-to-enum
+  "Get the Java Enum value based on keyword."
+  [keyword]
   {:pre [(keyword? keyword)]}
   (case keyword
     :sync Action$Type/SYNC
@@ -18,7 +20,9 @@
     :close Action$Type/CLOSE
     (throw (Exception.))))
 
-(defn action [interp-action]
+(defn action
+  "Create a new action (Java class)"
+  [interp-action]
   {:pre [(interp/action? interp-action)]}
   (Action. (:name interp-action)
            (action-type-keyword-to-enum (:type interp-action))
@@ -41,11 +45,15 @@
 ;;;; LTSs
 ;;;;
 
-(defn lts? [x]
+(defn lts?
+  "Check whether parameters is of type LTS"
+  [x]
   (= (type x) LTS))
 
-(defn lts [ast & {:keys [on-the-fly history]
-                  :or   {on-the-fly false, history false}}]
+(defn lts
+  "Cretae an LTS"
+  [ast & {:keys [on-the-fly history]
+          :or   {on-the-fly false, history false}}]
   (let [initial (if history [ast []] ast)
         expander (if history
                    (reify
@@ -65,10 +73,14 @@
       (.expandRecursively lts))
     lts))
 
-(defn initial-states [lts]
+(defn initial-states
+  "Get the initial states of an lts"
+  [lts]
   (.getInitialStates lts))
 
-(defn roles [lts]
+(defn roles
+  "Get the roles of an lts"
+  [lts]
   (reduce clojure.set/union
           (map (fn [^State s]
                  (reduce clojure.set/union
@@ -76,8 +88,12 @@
                               (.getActions (.getTransitionsOrNull s)))))
                (.getStates lts))))
 
-(defn bisimilar? [lts1 lts2]
+(defn bisimilar?
+  "Check whether lts1 and lts2 are bisimilar."
+  [lts1 lts2]
   (LTSs/bisimilar lts1 lts2))
 
-(defn not-bisimilar? [lts1 lts2]
+(defn not-bisimilar?
+  "Check whether lts1 and lts2 are not bisimilar."
+  [lts1 lts2]
   (not (bisimilar? lts1 lts2)))

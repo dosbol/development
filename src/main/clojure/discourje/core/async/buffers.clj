@@ -3,18 +3,26 @@
 
 (deftype Buffer [type n])
 
-(defn buffer? [x]
+(defn buffer?
+  "Check if value is of type Buffer"
+  [x]
   (= (clojure.core/type x) Buffer))
 
-(defn fixed-buffer [n]
+(defn fixed-buffer
+  "Create a fixed buffer where n > 0 elements."
+  [n]
   {:pre [(> n 0)]}
   (->Buffer :fixed-buffer n))
 
-(defn dropping-buffer [n]
+(defn dropping-buffer
+  "Create a dropping buffer where n > 0 elements."
+  [n]
   {:pre [(> n 0)]}
   (->Buffer :dropping-buffer n))
 
-(defn sliding-buffer [n]
+(defn sliding-buffer
+  "Create a sling buffer where n > 0 elements."
+  [n]
   {:pre [(> n 0)]}
   (->Buffer :sliding-buffer n))
 
@@ -22,11 +30,17 @@
 ;  {:pre [true]}
 ;  (->Buffer :promise-buffer 0))
 
-(defn n [buffer]
+(defn n
+  "Get the number of elements that the buffer holds
+  (access n field of Buffer type)"
+  [buffer]
   {:pre [(buffer? buffer)]}
   (.-n buffer))
 
-(defn type [buffer]
+(defn type
+  "Get the type of the buffer
+  (access type field of Buffer type)"
+  [buffer]
   {:pre [(buffer? buffer)]}
   (.-type buffer))
 

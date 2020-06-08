@@ -13,7 +13,9 @@
 (defonce ^:private eval-predicate-cache (atom (hash-map)))
 ;(reset! eval-predicate-cache (hash-map))
 
-(defn eval-predicate [predicate]
+(defn eval-predicate
+  "Evaluate a predicate"
+  [predicate]
   {:pre [(ast/predicate? predicate)]}
   (if-let [f (get @eval-predicate-cache predicate)]
     f
@@ -26,7 +28,9 @@
               (swap! eval-predicate-cache #(assoc % predicate f)))]
       f)))
 
-(defn eval-role [role]
+(defn eval-role
+  "Evaluate a role."
+  [role]
   {:pre [(or (ast/role? role) (fn? role) (keyword? role))]}
   (let [role (cond (ast/role? role) role
                    (fn? role) (role)

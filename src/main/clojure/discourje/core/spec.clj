@@ -13,7 +13,9 @@
 ;;;; Desugaring
 ;;;;
 
-(defn- desugared-predicate [form]
+(defn- desugared-predicate
+  "Unwrap predicate"
+  [form]
   (cond
     ;; form ::= (predicate expr)
     (and (seq? form) (= 'discourje.core.spec.ast/predicate (first (macroexpand form))))
@@ -26,7 +28,9 @@
     ;; form ::= expr
     :else `(predicate ~form)))
 
-(defn- desugared-role [form]
+(defn- desugared-role
+  "Unwrap role"
+  [form]
   (cond
     ;; form ::= (role name-expr index-exprs)
     (and (seq? form) (= 'discourje.core.spec.ast/role (first (macroexpand form))))
@@ -43,7 +47,9 @@
     ;; form ::= expr
     :else `(role ~form)))
 
-(defn- desugared-spec [form]
+(defn- desugared-spec
+  "Unwrap spec"
+  [form]
   (cond
     ;; form ::= (:session x y z)
     (and (seq? form) (keyword? (first form)))
@@ -60,7 +66,9 @@
 ;;;; Predicates
 ;;;;
 
-(defmacro predicate
+(defmacro
+  predicate
+  "Create a predicate"
   [expr]
   `(ast/predicate '~expr))
 
@@ -69,6 +77,7 @@
 ;;;;
 
 (defmacro role
+  "Create a Role."
   ([name-expr]
    `(role ~name-expr []))
   ([name-expr index-exprs]
@@ -76,6 +85,7 @@
               (w/postwalk-replace ~(smap &env) '~index-exprs))))
 
 (defn defrole
+  "Create a role"
   ([k]
    (defrole k (name k)))
   ([k name]
@@ -93,6 +103,7 @@
 ;;;;
 
 (defmacro -->
+  "Create monitored send-receive interation on unbuffered channel"
   ([sender receiver]
    `(--> ~'Object ~sender ~receiver))
   ([predicate sender receiver]
@@ -102,6 +113,7 @@
      `(ast/sync ~predicate ~sender ~receiver))))
 
 (defmacro -->>
+  "Create monitored send-receive interation on unbuffered channel"
   ([sender receiver]
    `(-->> ~'Object ~sender ~receiver))
   ([predicate sender receiver]
@@ -115,6 +127,7 @@
                              ~receiver)]))))
 
 (defmacro close
+  "Create monitored close."
   [sender receiver]
   (clojure.core/let [sender (desugared-role sender)
                      receiver (desugared-role receiver)]
@@ -125,10 +138,12 @@
 ;;;;
 
 (defmacro end
+  "End the protocol"
   []
   `(ast/end))
 
 (defmacro any
+  "Create monitored any interaction (Use with alts)"
   [roles]
   (clojure.core/let [object (ast/predicate 'Object)
                      roles (map desugared-role roles)
@@ -184,14 +199,17 @@
       `(~f ~branches))))
 
 (defmacro cat
+  "Create monitored choice operation."
   [& branches]
   (multiary `ast/cat branches))
 
 (defmacro alt
+  "Create monitored alt operation."
   [& branches]
   (multiary `ast/alt branches))
 
 (defmacro par
+  "Create monitored parallel operation."
   [& branches]
   (multiary `ast/par branches))
 

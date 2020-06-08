@@ -6,11 +6,14 @@
             [discourje.core.async.monitors :as monitors]
             [discourje.core.spec.lts :as lts]))
 
-(defn monitor [spec & {:keys [on-the-fly history]
-                       :or   {on-the-fly true, history false}}]
+(defn monitor
+  "Create a monitor"
+  [spec & {:keys [on-the-fly history]
+           :or   {on-the-fly true, history false}}]
   (monitors/monitor (lts/lts spec :on-the-fly on-the-fly :history history)))
 
 (defn link
+  "Link a sender, receiver and monitor to a channel"
   ([channel sender receiver monitor]
    (link channel sender receiver monitor nil))
   ([channel sender receiver monitor options]
@@ -21,6 +24,7 @@
 ;;;;
 
 (defn chan
+  "Cretae a channel"
   ([]
    (channels/unbuffered-channel))
   ([buf-or-n]
@@ -45,6 +49,7 @@
    (throw (UnsupportedOperationException.))))
 
 (defn close!
+  "Close a channel"
   [chan]
   (channels/close! chan))
 
@@ -53,14 +58,17 @@
 ;;;;
 
 (defn >!!
+  "Put"
   [port val]
   (channels/>!! port val))
 
 (defn <!!
+  "Take"
   [port]
   (channels/<!! port))
 
 (defmacro thread
+  "Create a Thread"
   [& body]
   (let [clj (macroexpand `(a/thread ~@body))]
     `(let [c# (chan 1)]
@@ -82,12 +90,14 @@
 ;;;;
 
 (defn alts!!
+  "Alts!!"
   [ports & {:as opts}]
   (channels/alts!! ports opts))
 
 ;; TODO: alts!
 
 (defn timeout
+  "Create a time out of x msecs, use with alts!!"
   [msecs]
   (let [c (chan 1)]
     (a/take! (a/timeout msecs) (fn [_] (close! c)))
@@ -98,10 +108,12 @@
 ;;;;
 
 (defn dropping-buffer
+  "Create a dropping buffer"
   [n]
   (buffers/dropping-buffer n))
 
 (defn sliding-buffer
+  "Create a sliding buffer"
   [n]
   (buffers/sliding-buffer n))
 

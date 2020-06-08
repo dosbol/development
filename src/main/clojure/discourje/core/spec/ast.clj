@@ -7,12 +7,16 @@
 
 (def role-names (atom (hash-map)))
 
-(defn put-role-name! [k name]
+(defn put-role-name!
+  "Add a role to the rolenames, hashmap"
+  [k name]
   {:pre [(keyword? k)
          (string? name)]}
   (swap! role-names (fn [m] (into m {k name}))))
 
-(defn get-role-name [k]
+(defn get-role-name
+  "Get a name based on it's keyword"
+  [k]
   {:pre [(keyword? k)]}
   (if-let [name (get @role-names k)]
     name
@@ -21,6 +25,7 @@
 (def asts (atom (hash-map)))
 
 (defn put-ast! [k vars body]
+  "Add an ast to the AST hashmap. Mapped by keyword k, machted by the role."
   {:pre [(keyword? k)]}
   (swap! asts
          (fn [m]
@@ -29,6 +34,7 @@
              (into m {k {(count vars) {:vars vars, :body body}}})))))
 
 (defn get-ast
+  "Get an AST based on the keyword. (matched by role)"
   [k n]
   {:pre [(keyword? k)
          (number? n)]}
@@ -44,10 +50,14 @@
 
 (defrecord Predicate [expr])
 
-(defn predicate? [x]
+(defn predicate?
+  "Check whether x is an instance of predicate"
+  [x]
   (instance? Predicate x))
 
-(defn predicate [expr]
+(defn predicate
+  "Create a predicate of expression expr"
+  [expr]
   {:pre []}
   (->Predicate expr))
 
@@ -57,10 +67,13 @@
 
 (defrecord Role [name-expr index-exprs])
 
-(defn role? [x]
+(defn role?
+  "Check whether x is an instance of Role"
+  [x]
   (instance? Role x))
 
 (defn role
+  "Create a role"
   ([expr]
    {:pre [(or (not (coll? expr)) (seq? expr))]}
    (cond
@@ -77,26 +90,38 @@
 
 (defrecord Action [type predicate sender receiver])
 
-(defn action? [x]
+(defn action?
+  "Check whether x is of type Action"
+  [x]
   (= (type x) Action))
 
-(defn action [type predicate sender receiver]
+(defn action
+  "Create an action."
+  [type predicate sender receiver]
   {:pre [(contains? #{:sync :send :receive :close} type)
          (or (predicate? predicate) (symbol? predicate))
          (or (role? sender) (symbol? sender))
          (or (role? receiver) (symbol? receiver))]}
   (->Action type predicate sender receiver))
 
-(defn sync [predicate sender receiver]
+(defn sync
+  "Create a sync action"
+  [predicate sender receiver]
   (action :sync predicate sender receiver))
 
-(defn send [predicate sender receiver]
+(defn send
+  "Create a send action"
+  [predicate sender receiver]
   (action :send predicate sender receiver))
 
-(defn receive [sender receiver]
+(defn receive
+  "Create a receive action"
+  [sender receiver]
   (action :receive (predicate '(fn [_] true)) sender receiver))
 
-(defn close [sender receiver]
+(defn close
+  "Create a close action"
+  [sender receiver]
   (action :close (predicate '(fn [_] true)) sender receiver))
 
 ;;;;
@@ -105,7 +130,9 @@
 
 (defrecord Nullary [type])
 
-(defn end []
+(defn end
+  "Create end type"
+  []
   (->Nullary :end))
 
 ;;;;
@@ -114,11 +141,19 @@
 
 (defrecord Multiary [type branches])
 
-(defn cat [branches]
+(defn cat
+  "Creat choises"
+  [branches]
   (->Multiary :cat branches))
-(defn alt [branches]
+
+(defn alt
+  "create alt"
+  [branches]
   (->Multiary :alt branches))
-(defn par [branches]
+
+(defn par
+  "create parallel"
+  [branches]
   (->Multiary :par branches))
 
 (defrecord Every [type ast-f vars exprs branch])
@@ -137,12 +172,15 @@
 
 (defrecord If [type test-expr then else])
 
-(defn if [test-expr then else]
+(defn if
+  "Create If monitor"
+  [test-expr then else]
   (->If :if test-expr then else))
 
 (defrecord Loop [type name vars exprs body])
 
 (defn loop
+  "Create loop monitor"
   ([name bindings body]
    (let [vars (take-nth 2 bindings)
          exprs (take-nth 2 (rest bindings))]
@@ -152,17 +190,23 @@
 
 (defrecord Recur [type name exprs])
 
-(defn recur [name exprs]
+(defn recur
+  "Create recur, back to loop"
+  [name exprs]
   (->Recur :recur name exprs))
 
 ;;;;
 ;;;; Misc operators
 ;;;;
 
-(defn- parse-predicate [s]
+(defn- parse-predicate
+  "Evaluate predicate with string s"
+  [s]
   (predicate (read-string s)))
 
-(defn- parse-role [s]
+(defn- parse-role
+  "Parse a role"
+  [s]
   (if (clojure.string/includes? s "[")
     (let [name-expr (subs s 0 (clojure.string/index-of s "["))
           index-exprs (mapv read-string
@@ -174,6 +218,7 @@
     (role s)))
 
 (defn- parse-action
+  "Parse an action"
   ([s]
    (parse-action (case (first s)
                    \‽ :sync
@@ -194,7 +239,9 @@
 
 (defrecord Graph [type v edges])
 
-(defn graph [v0 edges]
+(defn graph
+  "Create a graph"
+  [v0 edges]
   (->Graph :graph
            v0
            (clojure.core/loop [edges edges
@@ -219,5 +266,7 @@
 
 (defrecord Session [type name exprs])
 
-(defn session [name exprs]
+(defn session
+  "Cretae a session with name and expressions"
+  [name exprs]
   (->Session :session name exprs))

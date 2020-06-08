@@ -4,6 +4,7 @@
 (deftype Monitor [lts current-states flag])
 
 (defn monitor
+  "Create a monitor based on an Labelled Transition System (LTS)"
   [lts]
   {:pre [(lts/lts? lts)]}
   (->Monitor lts
@@ -11,21 +12,26 @@
              (atom false)))
 
 (defn monitor?
+  "Check whether x is of type Monitor"
   [x]
   (= (type x) Monitor))
 
 (defn str-lts
+  "(str lts)"
   [monitor]
   {:pre [(monitor? monitor)]}
   (str (.-lts monitor)))
 
 (defn str-current-states
+  "Get the current states of the monitor"
   [monitor]
   {:pre [(monitor? monitor)]}
   (let [s (str @(.-current_states monitor))]
     (subs s 1 (dec (count s)))))
 
-(defn- runtime-exception [lts current-states type message sender receiver]
+(defn- runtime-exception
+  "Create a readable runtime exception"
+  [lts current-states type message sender receiver]
   (ex-info (str "[SESSION FAILURE] Action "
                 (case type :sync "‽" :send "!" :receive "?" :close "C" (throw (Exception.)))
                 "("
@@ -46,6 +52,7 @@
             :receiver       receiver}))
 
 (defn verify!
+  "Verify if the current operation `type' of `message' from `sender' to `receiver' is allowed on by the `monitor'."
   [monitor type message sender receiver]
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if (nil? monitor)
@@ -69,6 +76,7 @@
           (recur))))))
 
 (defn lower-flag!
+  "Lower flag that virificaion is currently taking place."
   [monitor]
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if (nil? monitor)
