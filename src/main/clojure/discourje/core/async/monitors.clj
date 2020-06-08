@@ -14,17 +14,6 @@
   [x]
   (= (type x) Monitor))
 
-(defn str-lts
-  [monitor]
-  {:pre [(monitor? monitor)]}
-  (str (.-lts monitor)))
-
-(defn str-current-states
-  [monitor]
-  {:pre [(monitor? monitor)]}
-  (let [s (str @(.-current_states monitor))]
-    (subs s 1 (dec (count s)))))
-
 (defn- runtime-exception [lts current-states type message sender receiver]
   (ex-info (str "[SESSION FAILURE] Action "
                 (case type :sync "‽" :send "!" :receive "?" :close "C" (throw (Exception.)))
