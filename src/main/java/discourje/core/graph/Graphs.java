@@ -1,4 +1,4 @@
-package discourje.core.spec.graph;
+package discourje.core.graph;
 
 import java.util.*;
 import java.util.function.BooleanSupplier;

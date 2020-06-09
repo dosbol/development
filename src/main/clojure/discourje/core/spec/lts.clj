@@ -3,7 +3,7 @@
             [clojure.java.shell :refer [sh]]
             [discourje.core.spec.interp :as interp])
   (:import (java.util.function Function Predicate Supplier)
-           (discourje.core.spec.graph Graph Graphs Edge$Label)))
+           (discourje.core.graph Graph Graphs Edge$Label)))
 
 (defn- label [interp-action]
   {:pre [(interp/action? interp-action)]}
