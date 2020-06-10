@@ -51,7 +51,7 @@ public class Graph<State, Action, Test extends Predicate<Object> & Supplier<Obje
         sortedVertices.sort(Comparator.comparingInt(vertexIds::get));
         for (Vertex<State, Action, Test> v : sortedVertices) {
             b.append(System.lineSeparator());
-            b.append(v.toString(vertexIds));
+            b.append(v.toStringDeep());
         }
 
         return b.toString();
@@ -63,6 +63,14 @@ public class Graph<State, Action, Test extends Predicate<Object> & Supplier<Obje
 
     public Collection<Vertex<State, Action, Test>> getRoots() {
         return roots;
+    }
+
+    public int getVertexId(Vertex<?, ?, ?> v) {
+        if (!vertexIds.containsKey(v)) {
+            throw new IllegalArgumentException();
+        }
+
+        return vertexIds.get(v);
     }
 
     public Collection<Vertex<State, Action, Test>> getVertices() {

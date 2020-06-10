@@ -35,6 +35,19 @@ public class Edge<State, Action, Test extends Predicate<Object> & Supplier<Objec
         return Objects.hash(source, target, label);
     }
 
+    @Override
+    public String toString() {
+        var b = new StringBuilder();
+        b.append("(");
+        b.append(source);
+        b.append(",");
+        b.append("\"").append(label).append("\"");
+        b.append(",");
+        b.append(target);
+        b.append(")");
+        return b.toString();
+    }
+
     //
     // Edge.Collection
     //

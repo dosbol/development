@@ -35,6 +35,11 @@ public class Vertex<State, Action, Test extends Predicate<Object> & Supplier<Obj
         return Objects.hash(state);
     }
 
+    @Override
+    public String toString() {
+        return Integer.toString(graph.getVertexId(this));
+    }
+
     //
     // Vertex
     //
@@ -113,27 +118,19 @@ public class Vertex<State, Action, Test extends Predicate<Object> & Supplier<Obj
         return edges.get().size();
     }
 
-    public String toString(Map<Vertex<State, Action, Test>, Integer> vertexIds) {
+    public String toStringDeep() {
         var b = new StringBuilder();
 
         if (isExpanded()) {
-            for (Edge.Label<Action, Test> l : edges.get().getLabels()) {
-                for (Vertex<?, ?, ?> target : edges.get().getTargets(l)) {
-                    b.append("(");
-                    b.append(vertexIds.get(this));
-                    b.append(",");
-                    b.append("\"").append(l).append("\"");
-                    b.append(",");
-                    b.append(vertexIds.get(target));
-                    b.append(")");
-                    b.append(System.lineSeparator());
-                }
+            for (Edge<State, Action, Test> e : edges.get()) {
+                b.append(e);
+                b.append(System.lineSeparator());
             }
             if (b.length() > 0) {
                 b.deleteCharAt(b.length() - 1);
             }
         } else {
-            b.append("*** ").append(vertexIds.get(this)).append(" not yet expanded ***");
+            b.append("*** ").append(this).append(" not yet expanded ***");
         }
 
         return b.toString();
