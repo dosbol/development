@@ -54,9 +54,14 @@
 ;                              (.getActions (.getTransitionsOrNull s)))))
 ;               (.getStates lts))))
 
-(defn expand-then-perform! [source-states type message sender receiver]
+(defn traverse-eventually! [source-states command message]
+  (Graphs/traverseEventually source-states
+                             command
+                             message))
+
+(defn traverse-now! [source-states command message]
   (Graphs/traverseNow source-states
-                      [type sender receiver]
+                      command
                       message))
 
 (defn bisimilar? [lts1 lts2]

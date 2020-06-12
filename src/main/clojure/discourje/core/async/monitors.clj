@@ -1,66 +1,161 @@
 (ns discourje.core.async.monitors
-  (:require [discourje.core.spec.lts :as lts]))
+  (:require [clojure.core.async :as a]
+            [discourje.core.spec.lts :as lts]))
 
-(deftype Monitor [lts current-states flag])
+(deftype Monitor [lts current-states wait-notify])
 
 (defn monitor
   [lts]
   {:pre [(lts/lts? lts)]}
   (->Monitor lts
              (atom (lts/initial-states lts))
-             (atom false)))
+             (let [a (atom {})]
+               (fn [k]
+                 (if-let [ch (get @a k)]
+                   ch
+                   (do (swap! a (fn [m] (if (contains? m k) m (assoc m k (a/chan)))))
+                       (recur k)))))))
 
 (defn monitor?
   [x]
   (= (type x) Monitor))
 
-(defn- runtime-exception [lts current-states type message sender receiver]
-  (ex-info (str "[SESSION FAILURE] Action "
-                (case type :sync "‽" :send "!" :receive "?" :close "C" (throw (Exception.)))
-                "("
-                (if (nil? message) "" (str message ","))
-                sender
-                ","
-                receiver
-                ") is not enabled in current state(s): "
-                current-states
-                ". LTS in Aldebaran format:\n\n"
-                lts
-                "\n\n")
-           {;:lts            lts
-            ;:current-states current-states
-            :type           type
-            :message        message
-            :sender         sender
-            :receiver       receiver}))
+;;;;
+;;;; Exceptions
+;;;;
 
-(defn verify!
-  [monitor type message sender receiver]
+(defn- str-command-message [[type sender receiver] message]
+  (str (case type
+         :sync "‽"
+         :send "!"
+         :receive "?"
+         :close "C"
+         (throw (Exception.))) "("
+       (if message (str message ","))
+       sender ","
+       receiver ")"))
+
+(defn- exception
+  ([lts current-states commands-and-messages]
+   (ex-info (str "[SESSION FAILURE] Action(s) "
+                 (mapv (fn [[command message]] (str-command-message command message)) commands-and-messages)
+                 " are not eventually enabled in current state(s): "
+                 current-states
+                 ". LTS in Aldebaran format:\n\n"
+                 lts
+                 "\n\n")
+            {:commands-and-messages commands-and-messages}))
+  ([lts current-states command message]
+   (ex-info (str "[SESSION FAILURE] Action "
+                 (str-command-message command message)
+                 " is not eventually enabled in current state(s): "
+                 current-states
+                 ". LTS in Aldebaran format:\n\n"
+                 lts
+                 "\n\n")
+            {:command command
+             :message message})))
+
+(defonce exception-dummy (Object.))
+
+;;;;
+;;;; Verification
+;;;;
+
+(defn wait! [monitor command]
+  (a/<!! ((.-wait_notify monitor) command)))
+
+(defn notify! [monitor command ok]
+  (a/>!! ((.-wait_notify monitor) command) ok))
+
+(defn verify-now!
+  [monitor [type _ _ :as command] message f]
   {:pre [(or (monitor? monitor) (nil? monitor))]}
-  (if (nil? monitor)
-    true
+  (if monitor
+
+    (if (and (= type :sync) (nil? message))
+      (let [ok (wait! monitor command)]
+        (if ok
+          [(f) nil]
+          [nil exception-dummy]))
+
+      (loop []
+        (let [source-states @(.-current_states monitor)
+              target-states (lts/traverse-now! source-states command message)
+              ok (not (empty? target-states))]
+          (if-let [v-and-e (locking monitor
+                             (when (= @(.-current_states monitor) source-states)
+                               (if (and (= type :sync) (not (nil? message)))
+                                 (notify! monitor command ok))
+                               (if ok
+                                 (do (reset! (.-current_states monitor) target-states)
+                                     (.notifyAll monitor)
+                                     [(f) nil])
+                                 [nil exception-dummy])))]
+            v-and-e
+            (recur)))))
+    [(f) nil]))
+
+(defn verify-eventually!
+  [monitor [type _ _ :as command] message]
+  {:pre [(or (monitor? monitor) (nil? monitor))]}
+  (if monitor
+
+    (if (and (= type :sync) (nil? message))
+      (let [ok (wait! monitor command)]
+        (if ok
+          [true nil]
+          [nil (exception (.-lts monitor) nil command nil)]))
+
+      (loop []
+        (let [source-states @(.-current_states monitor)
+              ok (lts/traverse-eventually! source-states command message)]
+
+          (if-let [v-and-e (locking monitor
+                             (when (= @(.-current_states monitor) source-states)
+                               (if (and (= type :sync) (not (nil? message)))
+                                 (notify! monitor command ok))
+                               (if ok
+                                 (do (if (not (lts/traverse-now! source-states command message))
+                                       (.wait monitor))
+                                     [true nil])
+                                 [false (exception (.-lts monitor) source-states command message)])))]
+            v-and-e
+            (recur)))))
+    [true nil]))
+
+(defn verify-eventually-some!
+  [monitor commands-and-messages]
+  {:pre [(or (monitor? monitor) (nil? monitor))]}
+  (if monitor
+
     (loop []
       (let [source-states @(.-current_states monitor)
-            target-states (lts/expand-then-perform! source-states
-                                                    type
-                                                    message
-                                                    sender
-                                                    receiver)]
+            _ (.println (System/err) (str "foo"))
 
-        (if (compare-and-set! (.-flag monitor) false true)
-          (if (compare-and-set! (.-current_states monitor) source-states target-states)
-            (if (empty? target-states)
-              (runtime-exception (.-lts monitor) source-states type message sender receiver)
-              true)
-            (do
-              (reset! (.-flag monitor) false)
-              (recur)))
-          (recur))))))
+            ok (loop [commands-and-messages commands-and-messages]
+                 (.println (System/err) (str "zzz"))
+                 (if (empty? commands-and-messages)
+                   false
+                   (let [[command message] (first commands-and-messages)]
+                     (if (lts/traverse-eventually! source-states command message)
+                       true
+                       (recur (rest commands-and-messages))))))
+            _ (.println (System/err) (str "bar"))]
 
-(defn lower-flag!
-  [monitor]
-  {:pre [(or (monitor? monitor) (nil? monitor))]}
-  (if (nil? monitor)
-    nil
-    (do (reset! (.-flag monitor) false)
-        nil)))
+        (if-let [v-and-e (locking monitor
+                           (when (= @(.-current_states monitor) source-states)
+                             (if ok
+                               (do (if (not (loop [commands-and-messages commands-and-messages]
+                                              (if (empty? commands-and-messages)
+                                                false
+                                                (let [[command message] (first commands-and-messages)]
+                                                  (if (lts/traverse-now! source-states command message)
+                                                    true
+                                                    (recur (rest commands-and-messages)))))))
+                                     (.wait monitor))
+                                   [true nil])
+                               [false (exception (.-lts monitor) source-states commands-and-messages)])))]
+          v-and-e
+          (recur))))
+    [true nil]))

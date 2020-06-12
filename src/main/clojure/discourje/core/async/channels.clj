@@ -5,6 +5,10 @@
             [discourje.core.spec.ast :as ast]
             [discourje.core.spec.interp :as interp]))
 
+;;;;
+;;;; Interfaces
+;;;;
+
 (definterface MutableSender
   (getSender [])
   (setSender [newSender]))
@@ -17,14 +21,22 @@
   (getMonitor [])
   (setMonitor [newMonitor]))
 
+;;;;
+;;;; Channels
+;;;;
+
 (deftype Channel
-  [buffered
-   ch
-   ch-ghost1
-   ch-ghost2
+  [type-put
+   type-take
+   ch-top
+   ch-mid
+   ch-bot
    ^:volatile-mutable sender
    ^:volatile-mutable receiver
    ^:volatile-mutable monitor]
+
+  Object
+  (toString [_] (str "[" (if sender sender "-") " " (if receiver receiver "-") "]"))
 
   MutableSender
   (getSender [_] sender)
@@ -41,13 +53,14 @@
 (defn channel? [x]
   (= (type x) Channel))
 
-(defn- channel [buffered ch ch-ghost1 ch-ghost2]
+(defn- channel [type-put type-take ch-top ch-mid ch-bot]
   {:pre []}
-  (->Channel buffered ch ch-ghost1 ch-ghost2 nil nil nil))
+  (->Channel type-put type-take ch-top ch-mid ch-bot nil nil nil))
 
 (defn unbuffered-channel []
   {:pre []}
-  (channel false (a/chan) (a/chan) nil))
+  (let [ch (a/chan)]
+    (channel :sync :sync ch ch ch)))
 
 (defn buffered-channel [buffer]
   {:pre [(buffers/buffer? buffer)]}
@@ -57,7 +70,7 @@
                  :dropping-buffer (a/chan (a/dropping-buffer (buffers/n buffer)))
                  :sliding-buffer (a/chan (a/sliding-buffer (buffers/n buffer)))
                  :promise-buffer (throw (IllegalArgumentException.))))]
-    (channel true (chan buffer) (chan buffer) (chan buffer))))
+    (channel :send :receive (chan buffer) (chan buffer) (chan buffer))))
 
 (defn link [this r1 r2 m]
   {:pre [(channel? this)
@@ -69,8 +82,7 @@
   (.setMonitor this m)
   this)
 
-(defonce ^:private token 0)
-(defonce ^:private sync-not-ok (Object.))
+(defonce ^:private token true)
 
 ;;;;
 ;;;; close!
@@ -79,134 +91,129 @@
 (defn close!
   [channel]
   {:pre [(channel? channel)]}
+  (let [sender (.getSender channel)
+        receiver (.getReceiver channel)
+        command [:close sender receiver]
+        monitor (.getMonitor channel)]
 
-  (let [result (monitors/verify! (.getMonitor channel)
-                                 :close
-                                 nil
-                                 (.getSender channel)
-                                 (.getReceiver channel))]
-    (if (.-buffered channel)
-
-      ;; Buffered channel
-      (if (true? result)
-
-        ;; Commit
-        (do (a/close! (.-ch channel))
-            (monitors/lower-flag! (.getMonitor channel))
-            (a/close! (.-ch_ghost1 channel))
-            (a/close! (.-ch_ghost2 channel)))
-
-        ;; Abort
-        (throw result))
-
-      ;; Unbuffered channel
-      (if (true? result)
-
-        ;; Commit
-        (do (a/close! (.-ch channel))
-            (monitors/lower-flag! (.getMonitor channel))
-            (a/close! (.-ch_ghost1 channel)))
-
-        ;; Abort
-        (throw result)))))
+    (loop []
+      (let [[v e] (monitors/verify-now! monitor command nil #(a/close! (.-ch_mid channel)))]
+        (if e
+          (let [[v e] (monitors/verify-eventually! monitor command nil)]
+            (if v
+              (recur)
+              (throw e)))
+          (do (a/close! (.-ch_top channel))
+              (a/close! (.-ch_bot channel))
+              v))))))
 
 ;;;;
 ;;;; >!! and <!!
 ;;;;
 
 (defn- >!!-step1
-  [channel]
+  [channel message]
   {:pre [(channel? channel)]}
-  (a/>!! (.-ch_ghost1 channel) token))
+  ;(.println (System/err) (str "[SESSION INFO] >!!-step1: " channel " " message))
+
+  [(a/>!! (.ch_top channel) token) nil])
 
 (defn- >!!-step2
   [channel message]
   {:pre [(channel? channel)]}
-  (if (.-buffered channel)
+  ;(.println (System/err) (str "[SESSION INFO] >!!-step2: " channel " " message))
 
-    ;; Buffered channel
-    (let [result (monitors/verify! (.getMonitor channel)
-                                   :send
-                                   message
-                                   (.getSender channel)
-                                   (.getReceiver channel))]
-      (if (true? result)
+  (let [type (.-type_put channel)
+        sender (.getSender channel)
+        receiver (.getReceiver channel)
+        monitor (.getMonitor channel)]
 
-        ;; Commit
-        (let [x (a/>!! (.-ch channel) message)
-              _ (monitors/lower-flag! (.getMonitor channel))
-              _ (a/>!! (.-ch_ghost2 channel) token)]
-          x)
+    (let [[v e] (monitors/verify-now! monitor [type sender receiver] message #(a/>!! (.-ch_mid channel) message))
+          channel-still-open (if e
+                               (a/<!! (.-ch_top channel))
+                               (a/>!! (.-ch_bot channel) token))]
 
-        ;; Abort
-        (do (a/<!! (.-ch_ghost1 channel))
-            (throw result))))
+      [v (if channel-still-open e)])))
 
-    ;; Unbuffered channel
-    (let [result (monitors/verify! (.getMonitor channel)
-                                   :sync
-                                   message
-                                   (.getSender channel)
-                                   (.getReceiver channel))]
-      (if (true? result)
+(defn- >!!-step3
+  [channel message]
+  {:pre [(channel? channel)]}
+  ;(.println (System/err) "[SESSION WARNING] Entering >!!-step3...")
 
-        ;; Commit
-        (let [x (a/>!! (.-ch channel) message)
-              _ (monitors/lower-flag! (.getMonitor channel))]
-          x)
+  (let [type (.-type_put channel)
+        sender (.getSender channel)
+        receiver (.getReceiver channel)
+        monitor (.getMonitor channel)]
 
-        ;; Abort
-        (do (a/>!! (.-ch channel) sync-not-ok)
-            (a/>!! (.-ch channel) result)
-            (throw result))))))
+    (let [v-and-e (monitors/verify-eventually! monitor [type sender receiver] message)]
+      v-and-e)))
 
 (defn >!!
   [channel message]
   {:pre [(channel? channel)]}
-  (if (>!!-step1 channel)
-    (>!!-step2 channel message)))
+  (loop []
+    (let [[v _] (>!!-step1 channel message)]
+      (if v
+        (let [[v e] (>!!-step2 channel message)]
+          (if e
+            (let [[v e] (>!!-step3 channel message)]
+              (if v
+                (recur)
+                (throw e)))
+            v))
+        nil))))
 
 (defn <!!-step1
   [channel]
   {:pre [(channel? channel)]}
-  (if (.-buffered channel)
-    (a/<!! (.-ch_ghost2 channel))
-    (a/<!! (.-ch_ghost1 channel))))
+  ;(.println (System/err) (str "[SESSION INFO] <!!-step1: " channel))
 
-(defn <!!-step2
+  [(a/<!! (.ch_bot channel)) nil])
+
+(defn- <!!-step2
   [channel]
   {:pre [(channel? channel)]}
-  (if (.-buffered channel)
+  ;(.println (System/err) (str "[SESSION INFO] <!!-step2: " channel))
 
-    ;; Buffered channel
-    (let [result (monitors/verify! (.getMonitor channel)
-                                   :receive
-                                   nil
-                                   (.getSender channel)
-                                   (.getReceiver channel))]
-      (if (true? result)
+  (let [type (.-type_take channel)
+        sender (.getSender channel)
+        receiver (.getReceiver channel)
+        monitor (.getMonitor channel)]
 
-        ;; Commit
-        (let [message (a/<!! (.ch channel))
-              _ (monitors/lower-flag! (.getMonitor channel))
-              _ (a/<!! (.-ch_ghost1 channel))]
-          message)
+    (let [[v e] (monitors/verify-now! monitor [type sender receiver] nil #(a/<!! (.ch_mid channel)))
+          channel-still-open (if e
+                               (a/>!! (.ch_bot channel) token)
+                               (a/<!! (.ch_top channel)))]
 
-        ;; Abort
-        (do (a/>!! (.-ch_ghost2 channel) token)
-            (throw result))))
+      [v (if channel-still-open e)])))
 
-    ;; Unbuffered channel
-    (let [message (a/<!! (.-ch channel))]
-      (if (= message sync-not-ok)
-        (throw (a/<!! (.-ch channel)))
-        message))))
+(defn- <!!-step3
+  [channel]
+  {:pre [(channel? channel)]}
+  ;(.println (System/err) "[SESSION WARNING] Entering <!!-step3...")
+
+  (let [type (.-type_take channel)
+        sender (.getSender channel)
+        receiver (.getReceiver channel)
+        monitor (.getMonitor channel)]
+
+    (let [v-and-e (monitors/verify-eventually! monitor [type sender receiver] nil)]
+      v-and-e)))
 
 (defn <!!
   [channel]
   {:pre [(channel? channel)]}
-  (if (<!!-step1 channel)
-    (<!!-step2 channel)))
+  (loop []
+    (let [[v _] (<!!-step1 channel)]
+      (if v
+        (let [[v e] (<!!-step2 channel)]
+          (if e
+            (let [[v e] (<!!-step3 channel)]
+              (if v
+                (recur)
+                (throw e)))
+            v))
+        nil))))
 
 ;;;;
 ;;;; >! and <!
@@ -220,140 +227,85 @@
 
 ;; TODO: alts!
 
-(defn alts!!
+(defn alts!!-step1
   [alternatives opts]
   {:pre [(every? #(or (and (vector? %) (= 2 (count %)) (channel? (first %)))
                       (channel? %))
                  alternatives)]}
 
   (let [ports (mapv #(if (vector? %)
-                       (let [channel (first %)
-                             port (.-ch_ghost1 channel)]
-                         [port token])
-                       (let [channel %
-                             port (if (.-buffered channel)
-                                    (.-ch_ghost2 channel)
-                                    (.-ch_ghost1 channel))]
-                         port))
+                       [(.-ch_top (first %)) token]
+                       (.-ch_bot %))
                     alternatives)
 
-        [val port] (if (nil? opts)
-                     (a/alts!! ports)
+        [val port] (if opts
                      (if (contains? opts :default)
                        (if (contains? opts :priority)
                          (a/alts!! ports :default (:default opts) :priority (:priority opts))
                          (a/alts!! ports :default (:default opts)))
                        (if (contains? opts :priority)
                          (a/alts!! ports :priority (:priority opts))
-                         (a/alts!! ports))))
+                         (a/alts!! ports)))
+                     (a/alts!! ports))
 
-        alternative (if (= port :default)
-                      nil
-                      (loop [todo alternatives]
-                        (if (empty? todo)
-                          (throw (Exception.))
-                          (let [alternative (first todo)]
-                            (if (vector? alternative)
-                              (let [channel (first alternative)]
-                                (if (= port (.-ch_ghost1 channel))
-                                  alternative
-                                  (recur (rest todo))))
-                              (let [channel alternative]
-                                (if (= port (if (.-buffered channel)
-                                              (.-ch_ghost2 channel)
-                                              (.-ch_ghost1 channel)))
-                                  alternative
-                                  (recur (rest todo)))))))))]
+        alternative (loop [alternatives alternatives]
+                      (if (empty? alternatives)
+                        [:default val]
+                        (let [alternative (first alternatives)
+                              ch (if (vector? alternative)
+                                   (.-ch_top (first alternative))
+                                   (.-ch_bot alternative))]
+                          (if (= port ch)
+                            alternative
+                            (recur (rest alternatives))))))]
 
-    (if alternative
-      (if (vector? alternative)
-        (let [channel (first alternative)
-              message (second alternative)]
-          (if val
-            [(>!!-step2 channel message) channel]
-            [nil channel]))
-        (let [channel alternative]
-          (if val
-            [(<!!-step2 channel) channel]
-            [nil channel])))
-      [val :default])))
+    [[alternative [val (if (vector? alternative) (first alternative) alternative)]] nil]))
 
-;;;;
-;;;; put! and take!
-;;;;
+(defn alts!!-step2
+  [alternative]
+  (if (and (vector? alternative) (= :default (first alternative)))
+    [[(second alternative) :default] nil]
+    (if (vector? alternative)
+      (let [[channel message] alternative
+            [v e] (>!!-step2 channel message)]
+        [[v channel] e])
+      (let [channel alternative
+            [v e] (<!!-step2 channel)]
+        [[v channel] e]))))
 
-;;; *** Untested code: ***
-;
-;;; To do: Add lower-flag! after positive verify!
-;
-;(defn put!
-;  [channel message f]
-;  {:pre [(channel? channel) (fn? f)]}
-;  (if (.-buffered channel)
-;
-;    ;; Buffered channel
-;    (a/put! (.-ch_ghost1 channel)
-;            token
-;            (fn [_] (if (monitors/verify! (.getMonitor channel)
-;                                          :send
-;                                          message
-;                                          (.getSender channel)
-;                                          (.getReceiver channel))
-;
-;                      ;; If ok, commit
-;                      (a/put! (.-ch channel)
-;                              message
-;                              (fn [x] (a/put! (.-ch_ghost2 channel)
-;                                              token
-;                                              (fn [_] (f x)))))
-;
-;                      ;; If not ok, abort
-;                      (a/take! (.-ch_ghost1 channel)
-;                               (fn [_] (throw (RuntimeException.)))))))
-;
-;    ;; Unbuffered channel
-;    (a/put! (.-ch_ghost1 channel)
-;            token
-;            (fn [_] (if (monitors/verify! (.getMonitor channel)
-;                                          :sync
-;                                          message
-;                                          (.getSender channel)
-;                                          (.getReceiver channel))
-;
-;                      (a/put! (.-ch channel)
-;                              message
-;                              f)
-;
-;                      (a/put! (.-ch channel)
-;                              sync-not-ok
-;                              (fn [_] (throw (RuntimeException.)))))))))
-;
-;(defn take!
-;  [channel f]
-;  {:pre [(channel? channel) (fn? f)]}
-;  (if (.-buffered channel)
-;
-;    ;; Buffered channel
-;    (a/take! (.-ch_ghost2 channel)
-;             (fn [_] (if (monitors/verify! (.getMonitor channel)
-;                                           :receive
-;                                           nil
-;                                           (.getSender channel)
-;                                           (.getReceiver channel))
-;
-;                       ;; If ok, commit
-;                       (a/take! (.-ch channel)
-;                                (fn [x] (a/take! (.-ch_ghost1 channel)
-;                                                 (fn [_] (f x)))))
-;
-;                       ;; If not ok, abort
-;                       (a/put! (.-ch_ghost2 channel)
-;                               token
-;                               (fn [_] (throw (RuntimeException.)))))))
-;
-;    ;; Unbuffered channel
-;    (a/take! (.-ch_ghost1 channel)
-;             (fn [_] (a/take! (.-ch channel)
-;                              (fn [x] (if (= x sync-not-ok)
-;                                        (throw (RuntimeException.))
-;                                        (f x))))))))
+(defn alts!!-step3
+  [alternatives]
+  ;(.println (System/err) "[SESSION WARNING] Entering alts!!-step3...")
+
+  (let [monitors (map (fn [alternative]
+                        (let [[channel _] (if (vector? alternative) alternative [alternative nil])
+                              monitor (.getMonitor channel)]
+                          monitor))
+                      alternatives)
+        commands-and-messages (mapv (fn [alternative]
+                                      (let [[channel message] (if (vector? alternative) alternative [alternative nil])
+                                            type (if message (.-type_put channel) (.-type_take channel))
+                                            sender (.getSender channel)
+                                            receiver (.getReceiver channel)]
+                                        [[type sender receiver] message]))
+                                    alternatives)]
+
+    (let [v-and-e (monitors/verify-eventually-some! (first monitors) commands-and-messages)]
+      v-and-e)))
+
+(defn alts!!
+  [alternatives opts]
+  {:pre [(every? #(or (and (vector? %) (= 2 (count %)) (channel? (first %)))
+                      (channel? %))
+                 alternatives)]}
+  (loop []
+    (let [[v _] (alts!!-step1 alternatives opts)]
+      (if (first (second v))
+        (let [[v e] (alts!!-step2 (first v))]
+          (if e
+            (let [[v e] (alts!!-step3 alternatives)]
+              (if v
+                (recur)
+                (throw e)))
+            v))
+        (second v)))))
