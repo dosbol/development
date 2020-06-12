@@ -24,8 +24,8 @@
 ;;;; Exceptions
 ;;;;
 
-(defn- str-command-message [[type sender receiver] message]
-  (str (case type
+(defn- str-command-message [[op sender receiver] message]
+  (str (case op
          :handshake "‽"
          :send "!"
          :receive "?"
@@ -69,11 +69,11 @@
   (a/>!! ((.-wait_notify monitor) command) ok))
 
 (defn verify-now!
-  [monitor [type _ _ :as command] message f]
+  [monitor [op _ _ :as command] message f]
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if monitor
 
-    (if (and (= type :handshake) (nil? message))
+    (if (and (= op :handshake) (nil? message))
       (let [ok (wait! monitor command)]
         (if ok
           [(f) nil]
@@ -85,7 +85,7 @@
               ok (not (empty? target-states))]
           (if-let [v-and-e (locking monitor
                              (when (= @(.-current_states monitor) source-states)
-                               (if (and (= type :handshake) (not (nil? message)))
+                               (if (and (= op :handshake) (not (nil? message)))
                                  (notify! monitor command ok))
                                (if ok
                                  (do (reset! (.-current_states monitor) target-states)
@@ -97,11 +97,11 @@
     [(f) nil]))
 
 (defn verify-eventually!
-  [monitor [type _ _ :as command] message]
+  [monitor [op _ _ :as command] message]
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if monitor
 
-    (if (and (= type :handshake) (nil? message))
+    (if (and (= op :handshake) (nil? message))
       (let [ok (wait! monitor command)]
         (if ok
           [true nil]
@@ -113,7 +113,7 @@
 
           (if-let [v-and-e (locking monitor
                              (when (= @(.-current_states monitor) source-states)
-                               (if (and (= type :handshake) (not (nil? message)))
+                               (if (and (= op :handshake) (not (nil? message)))
                                  (notify! monitor command ok))
                                (if ok
                                  (do (if (not (lts/traverse-now! source-states command message))

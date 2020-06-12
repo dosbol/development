@@ -26,8 +26,8 @@
 ;;;;
 
 (deftype Channel
-  [type-put
-   type-take
+  [op-put
+   op-take
    ch-top
    ch-mid
    ch-bot
@@ -53,9 +53,9 @@
 (defn channel? [x]
   (= (type x) Channel))
 
-(defn- channel [type-put type-take ch-top ch-mid ch-bot]
+(defn- channel [op-put op-take ch-top ch-mid ch-bot]
   {:pre []}
-  (->Channel type-put type-take ch-top ch-mid ch-bot nil nil nil))
+  (->Channel op-put op-take ch-top ch-mid ch-bot nil nil nil))
 
 (defn unbuffered-channel []
   {:pre []}
@@ -123,12 +123,12 @@
   {:pre [(channel? channel)]}
   ;(.println (System/err) (str "[SESSION INFO] >!!-step2: " channel " " message))
 
-  (let [type (.-type_put channel)
+  (let [op (.op_put channel)
         sender (.getSender channel)
         receiver (.getReceiver channel)
         monitor (.getMonitor channel)]
 
-    (let [[v e] (monitors/verify-now! monitor [type sender receiver] message #(a/>!! (.-ch_mid channel) message))
+    (let [[v e] (monitors/verify-now! monitor [op sender receiver] message #(a/>!! (.-ch_mid channel) message))
           channel-still-open (if e
                                (a/<!! (.-ch_top channel))
                                (a/>!! (.-ch_bot channel) token))]
@@ -140,12 +140,12 @@
   {:pre [(channel? channel)]}
   ;(.println (System/err) "[SESSION WARNING] Entering >!!-step3...")
 
-  (let [type (.-type_put channel)
+  (let [op (.op_put channel)
         sender (.getSender channel)
         receiver (.getReceiver channel)
         monitor (.getMonitor channel)]
 
-    (let [v-and-e (monitors/verify-eventually! monitor [type sender receiver] message)]
+    (let [v-and-e (monitors/verify-eventually! monitor [op sender receiver] message)]
       v-and-e)))
 
 (defn >!!
@@ -175,12 +175,12 @@
   {:pre [(channel? channel)]}
   ;(.println (System/err) (str "[SESSION INFO] <!!-step2: " channel))
 
-  (let [type (.-type_take channel)
+  (let [op (.op_take channel)
         sender (.getSender channel)
         receiver (.getReceiver channel)
         monitor (.getMonitor channel)]
 
-    (let [[v e] (monitors/verify-now! monitor [type sender receiver] nil #(a/<!! (.ch_mid channel)))
+    (let [[v e] (monitors/verify-now! monitor [op sender receiver] nil #(a/<!! (.ch_mid channel)))
           channel-still-open (if e
                                (a/>!! (.ch_bot channel) token)
                                (a/<!! (.ch_top channel)))]
@@ -192,12 +192,12 @@
   {:pre [(channel? channel)]}
   ;(.println (System/err) "[SESSION WARNING] Entering <!!-step3...")
 
-  (let [type (.-type_take channel)
+  (let [op (.op_take channel)
         sender (.getSender channel)
         receiver (.getReceiver channel)
         monitor (.getMonitor channel)]
 
-    (let [v-and-e (monitors/verify-eventually! monitor [type sender receiver] nil)]
+    (let [v-and-e (monitors/verify-eventually! monitor [op sender receiver] nil)]
       v-and-e)))
 
 (defn <!!
@@ -284,10 +284,10 @@
                       alternatives)
         commands-and-messages (mapv (fn [alternative]
                                       (let [[channel message] (if (vector? alternative) alternative [alternative nil])
-                                            type (if message (.-type_put channel) (.-type_take channel))
+                                            op (if message (.op_put channel) (.op_take channel))
                                             sender (.getSender channel)
                                             receiver (.getReceiver channel)]
-                                        [[type sender receiver] message]))
+                                        [[op sender receiver] message]))
                                     alternatives)]
 
     (let [v-and-e (monitors/verify-eventually-some! (first monitors) commands-and-messages)]

@@ -75,17 +75,17 @@
 ;;;; Actions
 ;;;;
 
-(defrecord Action [type predicate sender receiver])
+(defrecord Action [op predicate sender receiver])
 
 (defn action? [x]
   (= (type x) Action))
 
-(defn action [type predicate sender receiver]
-  {:pre [(contains? #{:handshake :send :receive :close} type)
+(defn action [op predicate sender receiver]
+  {:pre [(contains? #{:handshake :send :receive :close} op)
          (or (predicate? predicate) (symbol? predicate))
          (or (role? sender) (symbol? sender))
          (or (role? receiver) (symbol? receiver))]}
-  (->Action type predicate sender receiver))
+  (->Action op predicate sender receiver))
 
 (defn handshake [predicate sender receiver]
   (action :handshake predicate sender receiver))
@@ -103,7 +103,7 @@
 ;;;; Nullary operators
 ;;;;
 
-(defrecord Nullary [type])
+(defrecord Nullary [op])
 
 (defn skip []
   (->Nullary :skip))
@@ -112,7 +112,7 @@
 ;;;; Multiary operators
 ;;;;
 
-(defrecord Multiary [type branches])
+(defrecord Multiary [op branches])
 
 (defn cat [branches]
   (->Multiary :cat branches))
@@ -123,7 +123,7 @@
 (defn async [branches]
   (->Multiary :async branches))
 
-(defrecord Every [type ast-f vars exprs branch])
+(defrecord Every [op ast-f vars exprs branch])
 
 (defn every
   ([ast-f bindings branch]
@@ -137,12 +137,12 @@
 ;;;; "Special forms" operators
 ;;;;
 
-(defrecord If [type test-expr then else])
+(defrecord If [op test-expr then else])
 
 (defn if [test-expr then else]
   (->If :if test-expr then else))
 
-(defrecord Loop [type name vars exprs body])
+(defrecord Loop [op name vars exprs body])
 
 (defn loop
   ([name bindings body]
@@ -152,7 +152,7 @@
   ([name vars exprs body]
    (->Loop :loop name vars exprs body)))
 
-(defrecord Recur [type name exprs])
+(defrecord Recur [op name exprs])
 
 (defn recur [name exprs]
   (->Recur :recur name exprs))
@@ -184,17 +184,17 @@
                    \C :close
                    (throw (Exception.)))
                  (subs s 2 (dec (count s)))))
-  ([type s]
-   (let [s (if (contains? #{:handshake :send} type)
+  ([op s]
+   (let [s (if (contains? #{:handshake :send} op)
              s
              (str "(fn [_] true)," s))
          tokens (clojure.string/split s #"\,")
          predicate (parse-predicate (nth tokens 0))
          sender (parse-role (nth tokens 1))
          receiver (parse-role (nth tokens 2))]
-     (action type predicate sender receiver))))
+     (action op predicate sender receiver))))
 
-(defrecord Graph [type v edges])
+(defrecord Graph [op v edges])
 
 (defn graph [v0 edges]
   (->Graph :graph
@@ -219,7 +219,7 @@
 ;;;; Sessions
 ;;;;
 
-(defrecord Session [type name exprs])
+(defrecord Session [op name exprs])
 
 (defn session [name exprs]
   (->Session :session name exprs))

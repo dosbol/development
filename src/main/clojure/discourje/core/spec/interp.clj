@@ -44,7 +44,7 @@
                       (throw (Exception.))))
                  (:index-exprs role))))))
 
-(defrecord Action [name type predicate sender receiver])
+(defrecord Action [name op predicate sender receiver])
 
 (defn action? [x]
   (= (type x) Action))
@@ -52,31 +52,31 @@
 (defn action
   ([ast-action]
    {:pre [(ast/action? ast-action)]}
-   (let [type (:type ast-action)
+   (let [op (:op ast-action)
          predicate (eval-predicate (:predicate ast-action))
          sender (eval-role (:sender ast-action))
          receiver (eval-role (:receiver ast-action))
-         name (str (case (:type ast-action)
+         name (str (case (:op ast-action)
                      :handshake "‽"
                      :send "!"
                      :receive "?"
                      :close "C"
                      (throw (Exception.))) "("
-                   (if (contains? #{:handshake :send} (:type ast-action)) (str (:expr (:predicate ast-action)) ",") "")
+                   (if (contains? #{:handshake :send} (:op ast-action)) (str (:expr (:predicate ast-action)) ",") "")
                    sender ","
                    receiver ")")]
-     (action name type predicate sender receiver)))
+     (action name op predicate sender receiver)))
 
-  ([name type predicate sender receiver]
+  ([name op predicate sender receiver]
    {:pre [(string? name)
-          (contains? #{:handshake :send :receive :close} type)
+          (contains? #{:handshake :send :receive :close} op)
           (fn? predicate)
           (string? sender)
           (string? receiver)]}
-   (->Action name type predicate sender receiver)))
+   (->Action name op predicate sender receiver)))
 
 (defn substitute [ast smap]
-  (case (:type ast)
+  (case (:op ast)
 
     ;; Actions
     :handshake (w/postwalk-replace smap ast)
@@ -118,7 +118,7 @@
     (throw (Exception.))))
 
 (defn unfold [ast ast-loop]
-  (case (:type ast)
+  (case (:op ast)
 
     ;; Actions
     :handshake ast
@@ -162,7 +162,7 @@
     (throw (Exception.))))
 
 (defn eval-ast [ast]
-  (case (:type ast)
+  (case (:op ast)
 
     ;; Actions
     :handshake (throw (Exception.))
@@ -223,7 +223,7 @@
     (throw (Exception.))))
 
 (defn subjects [ast]
-  (case (:type ast)
+  (case (:op ast)
 
     ;; Actions
     :handshake #{(:sender ast) (:receiver ast)}
@@ -256,7 +256,7 @@
     (throw (Exception.))))
 
 (defn terminated? [ast unfolded]
-  (case (:type ast)
+  (case (:op ast)
 
     ;; Actions
     :handshake false
@@ -295,7 +295,7 @@
   ([ast]
    (successors ast #{}))
   ([ast unfolded]
-   (case (:type ast)
+   (case (:op ast)
 
      ;; Actions
      :handshake {ast [(ast/skip)]}
@@ -393,7 +393,7 @@
      (throw (Exception.))))
   ([ast-multiary i unfolded]
    (let [branches (:branches ast-multiary)
-         f (case (:type ast-multiary)
+         f (case (:op ast-multiary)
              :cat ast/cat
              :alt ast/alt
              :par ast/par

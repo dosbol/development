@@ -8,7 +8,7 @@
 (defn- label [interp-action]
   {:pre [(interp/action? interp-action)]}
   (Edge$Label. (:name interp-action)
-               [(:type interp-action) (:sender interp-action) (:receiver interp-action)]
+               [(:op interp-action) (:sender interp-action) (:receiver interp-action)]
                (reify
                  Predicate
                  (test [_ message] ((:predicate interp-action) message))
