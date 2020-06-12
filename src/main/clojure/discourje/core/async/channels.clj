@@ -60,7 +60,7 @@
 (defn unbuffered-channel []
   {:pre []}
   (let [ch (a/chan)]
-    (channel :sync :sync ch ch ch)))
+    (channel :handshake :handshake ch ch ch)))
 
 (defn buffered-channel [buffer]
   {:pre [(buffers/buffer? buffer)]}

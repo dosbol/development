@@ -26,7 +26,7 @@
 
 (defn- str-command-message [[type sender receiver] message]
   (str (case type
-         :sync "‽"
+         :handshake "‽"
          :send "!"
          :receive "?"
          :close "C"
@@ -73,7 +73,7 @@
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if monitor
 
-    (if (and (= type :sync) (nil? message))
+    (if (and (= type :handshake) (nil? message))
       (let [ok (wait! monitor command)]
         (if ok
           [(f) nil]
@@ -85,7 +85,7 @@
               ok (not (empty? target-states))]
           (if-let [v-and-e (locking monitor
                              (when (= @(.-current_states monitor) source-states)
-                               (if (and (= type :sync) (not (nil? message)))
+                               (if (and (= type :handshake) (not (nil? message)))
                                  (notify! monitor command ok))
                                (if ok
                                  (do (reset! (.-current_states monitor) target-states)
@@ -101,7 +101,7 @@
   {:pre [(or (monitor? monitor) (nil? monitor))]}
   (if monitor
 
-    (if (and (= type :sync) (nil? message))
+    (if (and (= type :handshake) (nil? message))
       (let [ok (wait! monitor command)]
         (if ok
           [true nil]
@@ -113,7 +113,7 @@
 
           (if-let [v-and-e (locking monitor
                              (when (= @(.-current_states monitor) source-states)
-                               (if (and (= type :sync) (not (nil? message)))
+                               (if (and (= type :handshake) (not (nil? message)))
                                  (notify! monitor command ok))
                                (if ok
                                  (do (if (not (lts/traverse-now! source-states command message))

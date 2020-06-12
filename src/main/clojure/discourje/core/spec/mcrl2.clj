@@ -91,7 +91,7 @@
 ;
 ;(defn handshakes [actions & {:keys [message sender receiver]
 ;                             :or   {message nil, sender nil, receiver nil}}]
-;  (vec (filter #(and (= (:type %) :sync)
+;  (vec (filter #(and (= (:type %) :handshake)
 ;                     (if message (= (:expr (:predicate %)) message) true)
 ;                     (if sender (= (:sender %) sender) true)
 ;                     (if receiver (= (:receiver %) receiver) true))

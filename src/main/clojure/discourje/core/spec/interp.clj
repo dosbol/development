@@ -57,19 +57,19 @@
          sender (eval-role (:sender ast-action))
          receiver (eval-role (:receiver ast-action))
          name (str (case (:type ast-action)
-                     :sync "‽"
+                     :handshake "‽"
                      :send "!"
                      :receive "?"
                      :close "C"
                      (throw (Exception.))) "("
-                   (if (contains? #{:sync :send} (:type ast-action)) (str (:expr (:predicate ast-action)) ",") "")
+                   (if (contains? #{:handshake :send} (:type ast-action)) (str (:expr (:predicate ast-action)) ",") "")
                    sender ","
                    receiver ")")]
      (action name type predicate sender receiver)))
 
   ([name type predicate sender receiver]
    {:pre [(string? name)
-          (contains? #{:sync :send :receive :close} type)
+          (contains? #{:handshake :send :receive :close} type)
           (fn? predicate)
           (string? sender)
           (string? receiver)]}
@@ -79,7 +79,7 @@
   (case (:type ast)
 
     ;; Actions
-    :sync (w/postwalk-replace smap ast)
+    :handshake (w/postwalk-replace smap ast)
     :send (w/postwalk-replace smap ast)
     :receive (w/postwalk-replace smap ast)
     :close (w/postwalk-replace smap ast)
@@ -121,7 +121,7 @@
   (case (:type ast)
 
     ;; Actions
-    :sync ast
+    :handshake ast
     :send ast
     :receive ast
     :close ast
@@ -165,7 +165,7 @@
   (case (:type ast)
 
     ;; Actions
-    :sync (throw (Exception.))
+    :handshake (throw (Exception.))
     :send (throw (Exception.))
     :receive (throw (Exception.))
     :close (throw (Exception.))
@@ -226,7 +226,7 @@
   (case (:type ast)
 
     ;; Actions
-    :sync #{(:sender ast) (:receiver ast)}
+    :handshake #{(:sender ast) (:receiver ast)}
     :send #{(:sender ast)}
     :receive #{(:receiver ast)}
     :close #{(:sender ast)}
@@ -259,7 +259,7 @@
   (case (:type ast)
 
     ;; Actions
-    :sync false
+    :handshake false
     :send false
     :receive false
     :close false
@@ -298,7 +298,7 @@
    (case (:type ast)
 
      ;; Actions
-     :sync {ast [(ast/skip)]}
+     :handshake {ast [(ast/skip)]}
      :send {ast [(ast/skip)]}
      :receive {ast [(ast/skip)]}
      :close {ast [(ast/skip)]}

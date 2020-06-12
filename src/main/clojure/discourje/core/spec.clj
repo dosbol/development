@@ -99,7 +99,7 @@
    (clojure.core/let [predicate (desugared-predicate predicate)
                       sender (desugared-role sender)
                       receiver (desugared-role receiver)]
-     `(ast/sync ~predicate ~sender ~receiver))))
+     `(ast/handshake ~predicate ~sender ~receiver))))
 
 (defmacro -->>
   ([sender receiver]
@@ -133,7 +133,7 @@
   (clojure.core/let [object (ast/predicate 'Object)
                      roles (map desugared-role roles)
                      branches (mapv (fn [[sender receiver]]
-                                      `(ast/alt [(ast/sync ~object ~sender ~receiver)
+                                      `(ast/alt [(ast/handshake ~object ~sender ~receiver)
                                                  (ast/send ~object ~sender ~receiver)
                                                  (ast/receive ~sender ~receiver)
                                                  (ast/close ~sender ~receiver)]))

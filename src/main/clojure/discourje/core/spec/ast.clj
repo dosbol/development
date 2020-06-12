@@ -1,5 +1,5 @@
 (ns discourje.core.spec.ast
-  (:refer-clojure :exclude [sync send cat loop]))
+  (:refer-clojure :exclude [send cat loop]))
 
 ;;;;
 ;;;; Registries
@@ -81,14 +81,14 @@
   (= (type x) Action))
 
 (defn action [type predicate sender receiver]
-  {:pre [(contains? #{:sync :send :receive :close} type)
+  {:pre [(contains? #{:handshake :send :receive :close} type)
          (or (predicate? predicate) (symbol? predicate))
          (or (role? sender) (symbol? sender))
          (or (role? receiver) (symbol? receiver))]}
   (->Action type predicate sender receiver))
 
-(defn sync [predicate sender receiver]
-  (action :sync predicate sender receiver))
+(defn handshake [predicate sender receiver]
+  (action :handshake predicate sender receiver))
 
 (defn send [predicate sender receiver]
   (action :send predicate sender receiver))
@@ -178,14 +178,14 @@
 (defn- parse-action
   ([s]
    (parse-action (case (first s)
-                   \‽ :sync
+                   \‽ :handshake
                    \! :send
                    \? :receive
                    \C :close
                    (throw (Exception.)))
                  (subs s 2 (dec (count s)))))
   ([type s]
-   (let [s (if (contains? #{:sync :send} type)
+   (let [s (if (contains? #{:handshake :send} type)
              s
              (str "(fn [_] true)," s))
          tokens (clojure.string/split s #"\,")
