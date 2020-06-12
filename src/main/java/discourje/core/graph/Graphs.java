@@ -107,6 +107,17 @@ public class Graphs {
         }
     }
 
+    public static <Action> Boolean traverseEventually(Collection<Vertex<?, Action, ?>> vertices,
+                                                      Action a,
+                                                      Object o) {
+        for (Vertex<?, Action, ?> source : vertices) {
+            if (source.traverseEventually(a, o)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static <Action> Collection<Vertex<?, ?, ?>> traverseNow(Collection<Vertex<?, Action, ?>> vertices,
                                                                    Action a,
                                                                    Object o) {

@@ -90,10 +90,11 @@ public class Vertex<State, Action, Test extends Predicate<Object> & Supplier<Obj
         todo.push(this);
         while (!todo.isEmpty()) {
             var v = todo.pop();
-            if (traverseNow(a, o).isEmpty()) {
+
+            if (v.traverseNow(a, o).isEmpty()) {
                 done.add(v);
                 for (Vertex<State, Action, Test> target : v.edges.get().getTargets()) {
-                    if (!done.contains(v)) {
+                    if (!done.contains(target)) {
                         todo.push(target);
                     }
                 }
