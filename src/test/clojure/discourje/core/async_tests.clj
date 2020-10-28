@@ -21,16 +21,27 @@
 (use-fixtures :once defroles)
 
 (defmacro no-throw [& body]
-  `(try ~@body (catch RuntimeException e# e#)))
+  `(try ~@body (catch Throwable e# e#)))
 
 (defn failed? [thread]
-  (= (type (a/<!! thread)) ExceptionInfo))
+  (let [v (a/<!! thread)]
+    (contains? #{InterruptedException
+                 ExceptionInfo}
+               (type v))))
 
 (defn not-failed?
   ([thread]
    (not (failed? thread)))
   ([thread & vals]
    (contains? (set vals) (a/<!! thread))))
+
+(deftest watchdog
+  (let [m (a/monitor (s/--> ::alice ::bob))
+        c (a/chan (s/role ::alice) (s/role ::bob) m {})
+        t1 (a/thread (no-throw (a/>!! c "foo") (a/>!! c "foo")))
+        t2 (a/thread (no-throw (a/<!! c)))]
+    (is (failed? t1))
+    (is (not-failed? t2 "foo"))))
 
 ;;;;
 ;;;; CORE CONCEPTS: chan, close!
@@ -118,7 +129,7 @@
                             (s/--> ::carol ::dave)))
         c1 (a/chan (s/role ::alice) (s/role ::bob) m {})
         c2 (a/chan (s/role ::carol) (s/role ::dave) m {})
-        t1 (a/thread (no-throw (Thread/sleep 500)
+        t1 (a/thread (no-throw (Thread/sleep 100)
                                (a/>!! c1 "foo")))
         t2 (a/thread (no-throw (a/<!! c1)))
         t3 (a/thread (no-throw (a/>!! c2 "foo")))
@@ -161,7 +172,7 @@
                             (s/-->> ::carol ::dave)))
         c1 (a/chan 1 (s/role ::alice) (s/role ::bob) m {})
         c2 (a/chan 1 (s/role ::carol) (s/role ::dave) m {})
-        t1 (a/thread (no-throw (Thread/sleep 500)
+        t1 (a/thread (no-throw (Thread/sleep 100)
                                (a/>!! c1 "foo")))
         t2 (a/thread (no-throw (a/<!! c1)))
         t3 (a/thread (no-throw (a/>!! c2 "foo")))
@@ -529,9 +540,9 @@
     (is (not-failed? t3)))
 
   (let [m (a/monitor (s/alt (s/--> ::alice ::bob)
-                            (s/--> ::alice ::carol)))
+                            (s/--> ::carol ::alice)))
         c1 (a/chan (s/role ::alice) (s/role ::bob) m {})
-        c2 (a/chan (s/role ::alice) (s/role ::carol) m {})
+        c2 (a/chan (s/role ::carol) (s/role ::alice) m {})
         t1 (a/thread (no-throw (a/alts!! [[c1 "foo"] c2])))
         t2 (a/thread (no-throw (a/<!! c1)))
         t3 (a/thread (no-throw 3.14))]
@@ -540,9 +551,9 @@
     (is (not-failed? t3)))
 
   (let [m (a/monitor (s/alt (s/--> ::alice ::bob)
-                            (s/--> ::alice ::carol)))
+                            (s/--> ::carol ::alice)))
         c1 (a/chan (s/role ::alice) (s/role ::bob) m {})
-        c2 (a/chan (s/role ::alice) (s/role ::carol) m {})
+        c2 (a/chan (s/role ::carol) (s/role ::alice) m {})
         t1 (a/thread (no-throw (a/alts!! [[c1 "foo"] c2])))
         t2 (a/thread (no-throw 3.14))
         t3 (a/thread (no-throw (a/>!! c2 "bar")))]
@@ -562,9 +573,9 @@
     (is (not-failed? t3)))
 
   (let [m (a/monitor (s/alt (s/-->> ::alice ::bob)
-                            (s/-->> ::alice ::carol)))
+                            (s/-->> ::carol ::alice)))
         c1 (a/chan 1 (s/role ::alice) (s/role ::bob) m {})
-        c2 (a/chan 1 (s/role ::alice) (s/role ::carol) m {})
+        c2 (a/chan 1 (s/role ::carol) (s/role ::alice) m {})
         t1 (a/thread (no-throw (a/alts!! [[c1 "foo"] c2])))
         t2 (a/thread (no-throw (a/<!! c1)))
         t3 (a/thread (no-throw 3.14))]
@@ -593,9 +604,9 @@
     (is (not-failed? t3)))
 
   (let [m (a/monitor (s/alt (s/--> ::alice ::bob)
-                            (s/-->> ::alice ::carol)))
+                            (s/-->> ::carol ::alice)))
         c1 (a/chan (s/role ::alice) (s/role ::bob) m {})
-        c2 (a/chan 1 (s/role ::alice) (s/role ::carol) m {})
+        c2 (a/chan 1 (s/role ::carol) (s/role ::alice) m {})
         t1 (a/thread (no-throw (a/alts!! [[c1 "foo"] c2])))
         t2 (a/thread (no-throw (a/<!! c1)))
         t3 (a/thread (no-throw 3.14))]
@@ -604,9 +615,9 @@
     (is (not-failed? t3)))
 
   (let [m (a/monitor (s/alt (s/--> ::alice ::bob)
-                            (s/-->> ::alice ::carol)))
+                            (s/-->> ::carol ::alice)))
         c1 (a/chan (s/role ::alice) (s/role ::bob) m {})
-        c2 (a/chan 1 (s/role ::alice) (s/role ::carol) m {})
+        c2 (a/chan 1 (s/role ::carol) (s/role ::alice) m {})
         t1 (a/thread (no-throw (a/alts!! [[c1 "foo"] c2])))
         t2 (a/thread (no-throw 3.14))
         t3 (a/thread (no-throw (a/>!! c2 "bar")))]
@@ -644,7 +655,8 @@
 ;;;; CORE CONCEPTS: core.async/examples/walkthrough.clj
 ;;;;
 
-(deftest walkthrough
+;(deftest walkthrough
+(defn walkthrough []
 
   ;; chan, close!
 

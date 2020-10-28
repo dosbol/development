@@ -95,15 +95,15 @@
 
   ;; Chess
 
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.games.chess]
-                       {:buffered [true] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
-  (is true)
-
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.games.chess]
-                       {:buffered [false] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
-  (is true)
+  ;(print (main/run-all [:clj :dcj]
+  ;                     ['discourje.examples.games.chess]
+  ;                     {:buffered [true] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+  ;(is true)
+  ;
+  ;(print (main/run-all [:clj :dcj]
+  ;                     ['discourje.examples.games.chess]
+  ;                     {:buffered [false] :stockfish [(stockfish "mac")] :turns-per-player [1] :time-per-player [0]}))
+  ;(is true)
 
   ;; Rock-Paper-Scissors
 
@@ -129,24 +129,24 @@
                        {:buffered [false] :k [3]}))
   (is true))
 
-(deftest npb3-tests
-
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.npb3.cg]
-                       {:k [3] :class ['w] :secs [0]}))
-  (is true)
-
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.npb3.ft]
-                       {:k [3] :class ['w] :secs [0]}))
-  (is true)
-
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.npb3.is]
-                       {:k [3] :class ['w] :secs [0]}))
-  (is true)
-
-  (print (main/run-all [:clj :dcj]
-                       ['discourje.examples.npb3.cg]
-                       {:k [3] :class ['w] :secs [0]}))
-  (is true))
+;(deftest npb3-tests
+;
+;  (print (main/run-all [:clj :dcj]
+;                       ['discourje.examples.npb3.cg]
+;                       {:k [3] :class ['w] :secs [0]}))
+;  (is true)
+;
+;  (print (main/run-all [:clj :dcj]
+;                       ['discourje.examples.npb3.ft]
+;                       {:k [3] :class ['w] :secs [0]}))
+;  (is true)
+;
+;  (print (main/run-all [:clj :dcj]
+;                       ['discourje.examples.npb3.is]
+;                       {:k [3] :class ['w] :secs [0]}))
+;  (is true)
+;
+;  (print (main/run-all [:clj :dcj]
+;                       ['discourje.examples.npb3.cg]
+;                       {:k [3] :class ['w] :secs [0]}))
+;  (is true))

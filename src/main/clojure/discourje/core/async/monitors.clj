@@ -2,7 +2,7 @@
   (:require [clojure.core.async :as a]
             [discourje.core.spec.lts :as lts]))
 
-(deftype Monitor [lts current-states wait-notify])
+(deftype Monitor [lts current-states wait-notify roles-threads watchdog])
 
 (defn monitor
   [lts]
@@ -14,11 +14,64 @@
                  (if-let [ch (get @a k)]
                    ch
                    (do (swap! a (fn [m] (if (contains? m k) m (assoc m k (a/chan)))))
-                       (recur k)))))))
+                       (recur k)))))
+             (atom {})
+             (atom nil)))
 
 (defn monitor?
   [x]
   (= (type x) Monitor))
+
+(defn role-thread! [monitor role thread]
+  (if monitor
+    (loop []
+      (let [roles-threads @(.roles_threads monitor)]
+        (if (and (not (contains? roles-threads role)) (some? thread))
+          (throw (Exception.)))
+
+        (if (and (contains? roles-threads role)
+                 (some? (get roles-threads role))
+                 (not= (get roles-threads role) thread))
+          (throw (Exception. (str "[SESSION FAILURE] Different threads enact the same role (" role ")."))))
+
+        (let [roles-threads' (assoc roles-threads role thread)]
+          (if (compare-and-set! (.-roles_threads monitor)
+                                roles-threads
+                                roles-threads')
+            (if (or @(.-watchdog monitor) (some nil? (vals roles-threads')))
+              true
+              (if (compare-and-set! (.-watchdog monitor) nil true)
+                (a/thread
+
+                  (loop []
+                    (let [role-threads (vals roles-threads')
+                          async-dispatch-threads (filter #(.startsWith (.getName %) "async-dispatch")
+                                                         (.keySet (Thread/getAllStackTraces)))
+                          threads (concat role-threads async-dispatch-threads)]
+
+                      (doseq [thread threads] (.suspend thread))
+                      (let [states (map #(.getState %) threads)]
+                        (doseq [thread threads] (.resume thread))
+
+                        (if (some #{Thread$State/RUNNABLE} states)
+                          (do (Thread/sleep 500)
+                              (recur))
+                          (do ;(println (map #(str (.getName %) "/"
+                              ;                    (.getState %) ":"
+                              ;                    (get (zipmap (vals roles-threads') (keys roles-threads')) %))
+                              ;              role-threads))
+
+                              (doseq [thread role-threads]
+                                (if (= (.getState thread) Thread$State/WAITING)
+                                  (.interrupt thread)))))))))
+
+                ;(throw (ex-info (str "[SESSION FAILURE] "
+                ;                     (if (> (count states) 1)
+                ;                       (str (count states) " threads are stuck.")
+                ;                       "A thread is stuck."))
+                ;                {:states states}))
+                true))
+            (recur)))))))
 
 ;;;;
 ;;;; Exceptions
@@ -131,17 +184,13 @@
 
     (loop []
       (let [source-states @(.-current_states monitor)
-            _ (.println (System/err) (str "foo"))
-
             ok (loop [commands-and-messages commands-and-messages]
-                 (.println (System/err) (str "zzz"))
                  (if (empty? commands-and-messages)
                    false
                    (let [[command message] (first commands-and-messages)]
                      (if (lts/traverse-eventually! source-states command message)
                        true
-                       (recur (rest commands-and-messages))))))
-            _ (.println (System/err) (str "bar"))]
+                       (recur (rest commands-and-messages))))))]
 
         (if-let [v-and-e (locking monitor
                            (when (= @(.-current_states monitor) source-states)

@@ -80,6 +80,8 @@
   (.setSender this (interp/eval-role r1))
   (.setReceiver this (interp/eval-role r2))
   (.setMonitor this m)
+  (monitors/role-thread! m (.getSender this) nil)
+  (monitors/role-thread! m (.getReceiver this) nil)
   this)
 
 (defonce ^:private token true)
@@ -115,6 +117,10 @@
   [channel message]
   {:pre [(channel? channel)]}
   ;(.println (System/err) (str "[SESSION INFO] >!!-step1: " channel " " message))
+
+  (monitors/role-thread! (.getMonitor channel)
+                         (.getSender channel)
+                         (Thread/currentThread))
 
   [(a/>!! (.ch_top channel) token) nil])
 
@@ -167,6 +173,10 @@
   [channel]
   {:pre [(channel? channel)]}
   ;(.println (System/err) (str "[SESSION INFO] <!!-step1: " channel))
+
+  (monitors/role-thread! (.getMonitor channel)
+                         (.getReceiver channel)
+                         (Thread/currentThread))
 
   [(a/<!! (.ch_bot channel)) nil])
 
@@ -229,9 +239,13 @@
 
 (defn alts!!-step1
   [alternatives opts]
-  {:pre [(every? #(or (and (vector? %) (= 2 (count %)) (channel? (first %)))
-                      (channel? %))
-                 alternatives)]}
+
+  (let [alternative (first alternatives)
+        channel (if (vector? alternative) (first alternative) alternative)
+        monitor (.getMonitor channel)
+        role (if (vector? alternative) (.getSender channel) (.getReceiver channel))
+        thread (Thread/currentThread)]
+    (monitors/role-thread! monitor role thread))
 
   (let [ports (mapv #(if (vector? %)
                        [(.-ch_top (first %)) token]
@@ -297,7 +311,8 @@
   [alternatives opts]
   {:pre [(every? #(or (and (vector? %) (= 2 (count %)) (channel? (first %)))
                       (channel? %))
-                 alternatives)]}
+                 alternatives)
+         (> (count alternatives) 0)]}
   (loop []
     (let [[v _] (alts!!-step1 alternatives opts)]
       (if (first (second v))

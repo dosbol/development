@@ -6,6 +6,8 @@
             [discourje.core.async.monitors :as monitors]
             [discourje.core.spec.lts :as lts]))
 
+(.setKeepAliveTime @#'a/thread-macro-executor 0 java.util.concurrent.TimeUnit/NANOSECONDS)
+
 (defn monitor [spec & {:keys [on-the-fly history]
                        :or   {on-the-fly true, history false}}]
   (monitors/monitor (lts/lts spec :on-the-fly on-the-fly :history history)))
